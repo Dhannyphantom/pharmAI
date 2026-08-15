@@ -1,12 +1,20 @@
 @import "tailwindcss";
 
-@theme inline {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+/* ==========================================================================
+   DESIGN TOKENS
+   A layered "console" system: deep navy base, three surface elevations,
+   one bright "power" accent (cyan) and two supporting accents (blue, violet).
+   Status colors are reserved for status only — never used decoratively.
+   ========================================================================== */
 
-  --color-bg-deep: #050B18;
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+
+  --color-bg-deep: #060B16;
   --color-bg-panel: #0B1730;
-  --color-bg-panel-2: #0F1E3D;
+  --color-bg-panel-2: #101F3F;
+
   --color-hospital-blue: #2F6FED;
   --color-hospital-blue-dim: #1E4FBE;
   --color-ai-cyan: #22D3EE;
@@ -17,38 +25,98 @@
   --color-danger-dim: #7F1D1D;
 }
 
+:root {
+  --surface-0: rgba(255, 255, 255, 0.025);
+  --surface-1: rgba(255, 255, 255, 0.045);
+  --surface-2: rgba(255, 255, 255, 0.07);
+  --border-hair: rgba(255, 255, 255, 0.08);
+  --border-hair-strong: rgba(255, 255, 255, 0.14);
+  --ease-out-premium: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 html, body { height: 100%; }
 
+* { scrollbar-color: rgba(148,163,184,0.3) transparent; }
+
 body {
-  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(47,111,237,0.18), transparent),
-              radial-gradient(ellipse 60% 50% at 90% 10%, rgba(124,92,255,0.12), transparent),
-              #050B18;
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(47,111,237,0.16), transparent 60%),
+    radial-gradient(900px 700px at 100% 0%, rgba(124,92,255,0.12), transparent 55%),
+    radial-gradient(700px 500px at 50% 110%, rgba(34,211,238,0.06), transparent 60%),
+    #060B16;
+  background-attachment: fixed;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
+
+::selection { background: rgba(34,211,238,0.28); color: #fff; }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.25); border-radius: 8px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.4); }
+::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.25); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.4); background-clip: padding-box; }
+
+:focus-visible {
+  outline: 2px solid rgba(34,211,238,0.85);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ==========================================================================
+   SURFACES — three elevations, used deliberately (not on every element)
+   ========================================================================== */
 
 .glass {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.09);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  position: relative;
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-0));
+  border: 1px solid var(--border-hair);
+  border-radius: 16px;
+  box-shadow: 0 1px 0 0 rgba(255,255,255,0.05) inset, 0 12px 30px -18px rgba(0,0,0,0.6);
+  transition: border-color 0.25s var(--ease-out-premium), transform 0.25s var(--ease-out-premium), box-shadow 0.25s var(--ease-out-premium);
 }
 
 .glass-strong {
-  background: rgba(11,23,48,0.7);
-  border: 1px solid rgba(255,255,255,0.12);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: linear-gradient(180deg, rgba(16,31,63,0.92), rgba(11,23,48,0.86));
+  border: 1px solid var(--border-hair-strong);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
-.glow-cyan { box-shadow: 0 0 0 1px rgba(34,211,238,0.25), 0 0 40px -8px rgba(34,211,238,0.45); }
-.glow-blue { box-shadow: 0 0 0 1px rgba(47,111,237,0.3), 0 0 40px -8px rgba(47,111,237,0.5); }
-.glow-violet { box-shadow: 0 0 0 1px rgba(124,92,255,0.3), 0 0 40px -8px rgba(124,92,255,0.5); }
-.glow-danger { box-shadow: 0 0 0 1px rgba(239,68,68,0.35), 0 0 40px -8px rgba(239,68,68,0.5); }
-.glow-mint { box-shadow: 0 0 0 1px rgba(52,211,153,0.3), 0 0 40px -8px rgba(52,211,153,0.5); }
+/* Interactive surface: subtle lift + top-edge sheen on hover — the one
+   recurring micro-interaction used across cards, tiles, and nav items. */
+.surface-interactive {
+  cursor: pointer;
+}
+.surface-interactive::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34,211,238,0), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease, background 0.3s ease;
+  pointer-events: none;
+  border-radius: 16px 16px 0 0;
+}
+.surface-interactive:hover {
+  border-color: rgba(34,211,238,0.32);
+  transform: translateY(-2px);
+  box-shadow: 0 1px 0 0 rgba(255,255,255,0.06) inset, 0 20px 40px -20px rgba(0,0,0,0.65), 0 0 0 1px rgba(34,211,238,0.06);
+}
+.surface-interactive:hover::before {
+  opacity: 1;
+  background: linear-gradient(90deg, transparent, rgba(34,211,238,0.55), transparent);
+}
+.surface-interactive:active { transform: translateY(-1px) scale(0.996); }
+
+.glow-cyan { box-shadow: 0 0 0 1px rgba(34,211,238,0.25), 0 0 40px -12px rgba(34,211,238,0.5); }
+.glow-blue { box-shadow: 0 0 0 1px rgba(47,111,237,0.3), 0 0 40px -12px rgba(47,111,237,0.55); }
+.glow-violet { box-shadow: 0 0 0 1px rgba(124,92,255,0.3), 0 0 40px -12px rgba(124,92,255,0.55); }
+.glow-danger { box-shadow: 0 0 0 1px rgba(239,68,68,0.35), 0 0 40px -12px rgba(239,68,68,0.5); }
+.glow-mint { box-shadow: 0 0 0 1px rgba(52,211,153,0.3), 0 0 40px -12px rgba(52,211,153,0.5); }
+
+/* ==========================================================================
+   TYPOGRAPHY
+   ========================================================================== */
 
 .text-gradient {
   background: linear-gradient(90deg, #22D3EE, #7C5CFF 60%, #2F6FED);
@@ -57,9 +125,83 @@ body {
   color: transparent;
 }
 
+.text-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-ai-cyan);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.text-eyebrow::before {
+  content: "";
+  width: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--color-ai-cyan), transparent);
+}
+
+.tabular-nums { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+
+/* ==========================================================================
+   GRID / TEXTURE — faint, used once as ambient atmosphere
+   ========================================================================== */
+
 .grid-fade-mask {
   mask-image: radial-gradient(ellipse 70% 60% at 50% 20%, black 40%, transparent 90%);
   -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 20%, black 40%, transparent 90%);
+}
+
+.hud-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+/* ==========================================================================
+   BUTTONS
+   ========================================================================== */
+
+.btn-primary {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(135deg, var(--color-hospital-blue), var(--color-ai-violet));
+  box-shadow: 0 1px 0 0 rgba(255,255,255,0.25) inset, 0 10px 24px -10px rgba(47,111,237,0.55);
+}
+.btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.18), transparent 60%);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ==========================================================================
+   GAMIFICATION — achievement / status chips, level bars, quest steps
+   ========================================================================== */
+
+@keyframes achievement-pop {
+  0% { opacity: 0; transform: scale(0.85) translateY(4px); }
+  60% { opacity: 1; transform: scale(1.03) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.achievement-pop { animation: achievement-pop 0.45s var(--ease-out-premium); }
+
+@keyframes shimmer-sweep {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background-image: linear-gradient(100deg, transparent 40%, rgba(255,255,255,0.55) 50%, transparent 60%);
+  background-size: 200% 100%;
+  animation: shimmer-sweep 2.4s ease-in-out infinite;
 }
 
 @keyframes pulse-ring {
@@ -71,6 +213,35 @@ body {
   position: absolute; inset: 0; border-radius: 9999px;
   border: 2px solid currentColor;
   animation: pulse-ring 1.8s cubic-bezier(0.4,0,0.6,1) infinite;
+}
+
+@keyframes soft-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.soft-float { animation: soft-float 3.2s ease-in-out infinite; }
+
+/* Level / XP bar */
+.level-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border-hair);
+  overflow: hidden;
+}
+.level-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-ai-cyan), var(--color-ai-violet));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @media print { body { display: none; } }

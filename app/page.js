@@ -1,34 +1,38 @@
 "use client";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { FiActivity, FiArrowRight } from "react-icons/fi";
+import {
+  FiActivity, FiArrowRight, FiUser, FiHeart, FiAward, FiCamera, FiShare2,
+  FiSliders, FiPackage, FiAlertTriangle, FiAlertOctagon, FiCopy, FiDollarSign,
+} from "react-icons/fi";
 import NavBar from "@/components/NavBar";
-import { PrimaryButton, GhostButton } from "@/components/ui";
+import { GlowCard } from "@/components/ui";
 
 const MODULE_LINKS = [
-  { href: "/cases", label: "Patient Assessment", desc: "Full 5-step AI clinical review flow" },
-  { href: "/counseling", label: "Patient Counselling", desc: "AI-generated, pharmacist-reviewed patient info" },
-  { href: "/challenge", label: "AI vs Pharmacist", desc: "Live audience quiz with scoring" },
-  { href: "/scanner", label: "Prescription Scanner", desc: "Simulated handwriting-to-report pipeline" },
-  { href: "/interactions", label: "Interaction Visualizer", desc: "Pick two drugs, see the connection" },
-  { href: "/renal-calculator", label: "Renal Dose Calculator", desc: "Cockcroft-Gault CrCl + dose bands" },
-  { href: "/inventory", label: "Inventory Management", desc: "AI stock forecasting dashboard" },
-  { href: "/pharmacovigilance", label: "Pharmacovigilance", desc: "Signal detection from adverse reports" },
-  { href: "/drug-discovery", label: "Drug Discovery", desc: "Millions of molecules to one medicine" },
-  { href: "/hospital-dashboard", label: "Hospital Dashboard", desc: "Today's numbers, animated" },
-  { href: "/hallucination", label: "AI Hallucination Demo", desc: "When the AI is confidently wrong" },
-  { href: "/takeaway", label: "Final Takeaway", desc: "The closing message" },
+  { href: "/cases", label: "Patient Assessment", desc: "Full 5-step AI clinical review flow", icon: FiUser },
+  { href: "/counseling", label: "Patient Counselling & Drug Reference", desc: "Patient-facing card plus clinical dosing reference", icon: FiHeart },
+  { href: "/challenge", label: "AI vs Pharmacist", desc: "Live audience quiz with scoring", icon: FiAward },
+  { href: "/scanner", label: "Prescription Scanner", desc: "Simulated handwriting-to-report pipeline", icon: FiCamera },
+  { href: "/interactions", label: "Interaction Visualizer", desc: "Pick two drugs, see the connection", icon: FiShare2 },
+  { href: "/duplicate-check", label: "Duplicate Prescription Detection", desc: "Flags same-drug or same-class duplication", icon: FiCopy },
+  { href: "/renal-calculator", label: "Renal Dose Calculator", desc: "Cockcroft-Gault CrCl + dose bands", icon: FiSliders },
+  { href: "/nhis-ops", label: "NHIS Billing, Errors & Queue", desc: "Billing verification, error dashboard, queue analytics", icon: FiDollarSign },
+  { href: "/theatre", label: "O&G & Theatre", desc: "Request board with complication planning, requests, payment tracker", icon: FiActivity },
+  { href: "/inventory", label: "Inventory Management", desc: "Unit forecasting plus expiry, requisitions, variance, receiving", icon: FiPackage },
+  { href: "/pharmacovigilance", label: "Pharmacovigilance", desc: "Signal detection from adverse reports", icon: FiAlertTriangle },
+  { href: "/drug-discovery", label: "Drug Discovery", desc: "Millions of molecules to one medicine", icon: FiActivity },
+  { href: "/hallucination", label: "AI Hallucination Demo", desc: "When the AI is confidently wrong", icon: FiAlertOctagon },
 ];
 
 export default function Home() {
   return (
     <>
       <NavBar />
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center">
+      <main className="flex-1 flex flex-col items-center px-6 py-16 text-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="relative mb-8"
         >
           <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-ai-cyan via-hospital-blue to-ai-violet flex items-center justify-center glow-cyan relative">
@@ -41,14 +45,8 @@ export default function Home() {
           </div>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.15 }}
-        >
-          <div className="text-xs font-semibold tracking-[0.25em] text-ai-cyan uppercase mb-3">
-            Educational Demonstration
-          </div>
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.15 }}>
+          <div className="text-eyebrow justify-center mb-3">Educational Demonstration</div>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-4 tracking-tight">
             AI Clinical Pharmacy <span className="text-gradient">Assistant</span>
           </h1>
@@ -57,20 +55,41 @@ export default function Home() {
           </p>
         </motion.div>
 
+        {/* Primary flow — Attend to Patient */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="flex flex-col sm:flex-row gap-3 mb-16"
+          transition={{ duration: 0.6, delay: 0.25 }}
+          className="w-full max-w-2xl mb-14"
         >
-          <Link href="/cases">
-            <PrimaryButton className="flex items-center gap-2">
-              Begin Patient Assessment <FiArrowRight />
-            </PrimaryButton>
+          <Link href="/attend">
+            <GlowCard interactive glow="glow-violet" className="border-ai-violet/30 text-left py-7">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-ai-violet/15 border border-ai-violet/30 flex items-center justify-center text-ai-violet shrink-0">
+                    <FiUser size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-lg font-bold text-white">Attend to Patient</span>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-ai-violet bg-ai-violet/15 border border-ai-violet/30 rounded-full px-1.5 py-0.5">Start Here</span>
+                    </div>
+                    <p className="text-sm text-slate-400">Search a patient, then interactions, duplicates, renal dosing, ADR signals, billing, theatre and inventory all come to you.</p>
+                  </div>
+                </div>
+                <FiArrowRight className="text-ai-violet shrink-0 hidden sm:block" size={20} />
+              </div>
+            </GlowCard>
           </Link>
-          <Link href="#modules">
-            <GhostButton>Explore All Modules</GhostButton>
-          </Link>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="flex items-center gap-2 text-[11px] text-slate-500 mb-4 uppercase tracking-wide"
+        >
+          <span className="w-8 h-px bg-white/15" /> Or explore standalone tools <span className="w-8 h-px bg-white/15" />
         </motion.div>
 
         <motion.div
@@ -78,21 +97,32 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="w-full max-w-5xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-left"
+          className="w-full max-w-5xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 text-left"
         >
-          {MODULE_LINKS.map((m) => (
-            <Link
-              key={m.href}
-              href={m.href}
-              className="glass rounded-xl p-4 hover:border-ai-cyan/40 hover:bg-white/[0.06] transition group"
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-semibold text-sm text-white">{m.label}</span>
-                <FiArrowRight className="text-slate-500 group-hover:text-ai-cyan group-hover:translate-x-0.5 transition" size={14} />
-              </div>
-              <p className="text-xs text-slate-400">{m.desc}</p>
-            </Link>
-          ))}
+          {MODULE_LINKS.map((m, i) => {
+            const Icon = m.icon;
+            return (
+              <motion.div
+                key={m.href}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.04 * i, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <Link href={m.href} className="block h-full">
+                  <GlowCard interactive className="h-full group">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center border bg-white/[0.04] border-white/10 text-ai-cyan">
+                        <Icon size={16} />
+                      </div>
+                      <FiArrowRight className="text-slate-500 group-hover:text-ai-cyan group-hover:translate-x-0.5 transition-all mt-2" size={14} />
+                    </div>
+                    <span className="font-semibold text-sm text-white">{m.label}</span>
+                    <p className="text-xs text-slate-400 leading-relaxed mt-1">{m.desc}</p>
+                  </GlowCard>
+                </Link>
+              </motion.div>
+            );
+          })}
         </motion.div>
       </main>
     </>
