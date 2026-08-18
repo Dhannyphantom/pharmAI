@@ -1,18 +1,19 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   FiUser, FiAlertTriangle, FiCopy, FiActivity, FiShield,
   FiCheckCircle, FiXCircle, FiPhoneCall, FiEye, FiDollarSign, FiCamera,
   FiHeart, FiPackage, FiTarget, FiPercent, FiClock, FiChevronDown, FiChevronUp,
-  FiArrowRight, FiSend, FiFilter,
+  FiArrowRight, FiSend, FiFilter, FiPlus, FiZap,
 } from "react-icons/fi";
 import NavBar from "@/components/NavBar";
 import { PageHeader, GlowCard, FadeIn, StaggerList, SeverityPill, ProgressRing, GhostButton, PrimaryButton, BackButton } from "@/components/ui";
 import { getPatientByPid, getPatientAnalysis } from "@/lib/patients";
 import { getProcedureById } from "@/lib/surgicalData";
 import { LMIS_STATUS_STYLE } from "@/lib/lmis";
+import { getRecommendedAdditions } from "@/lib/prescriptionRecommendations";
 
 const ACTION_META = {
   Dispense: { icon: FiCheckCircle, color: "text-mint", bg: "bg-mint/10 border-mint/30" },
@@ -34,11 +35,28 @@ export default function PatientWorkspacePage() {
   const { pid } = useParams();
   const patient = getPatientByPid(decodeURIComponent(pid));
   const [dispensed, setDispensed] = useState({});
+  const [prescriptions, setPrescriptions] = useState(patient?.newPrescriptions || []);
   const [showBilling, setShowBilling] = useState(false);
   const [showCounselling, setShowCounselling] = useState(false);
   const [billingStatusFilter, setBillingStatusFilter] = useState("All");
   const [billingUnitFilter, setBillingUnitFilter] = useState("All");
   const [billingSort, setBillingSort] = useState("date-desc");
+
+  // Reset local prescription state if the person navigates from one patient
+  // straight to another without a full page reload.
+  useEffect(() => {
+    setPrescriptions(patient?.newPrescriptions || []);
+    setDispensed({});
+  }, [patient?.pid]);
+
+  const recommendedAdditions = useMemo(() => getRecommendedAdditions(prescriptions), [prescriptions]);
+
+  function addRecommended(rec) {
+    setPrescriptions((rx) => [
+      ...rx,
+      { drug: rec.item, dose: "", route: "N/A", frequency: "As needed for administration", dispensed: false, consumable: true, recommended: true },
+    ]);
+  }
 
   const filteredBilling = useMemo(() => {
     let rows = [...(patient?.billingHistory || [])];
@@ -141,14 +159,15 @@ export default function PatientWorkspacePage() {
           <GlowCard className="border-warn/20">
             <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2"><FiAlertTriangle className="text-warn" /> New Prescriptions — Pending Dispense</h3>
             <div className="space-y-2">
-              {patient.newPrescriptions.map((rx, i) => {
+              {prescriptions.map((rx, i) => {
                 const done = dispensed[i];
                 return (
-                  <div key={i} className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${done ? "bg-mint/5 border-mint/25" : "bg-warn/5 border-warn/20"}`}>
+                  <div key={i} className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${done ? "bg-mint/5 border-mint/25" : rx.recommended ? "bg-ai-cyan/5 border-ai-cyan/20" : "bg-warn/5 border-warn/20"}`}>
                     <div className="text-[13px]">
-                      <div className="text-white font-medium flex items-center gap-2">
+                      <div className="text-white font-medium flex items-center gap-2 flex-wrap">
                         {rx.drug} {rx.dose}
                         {rx.consumable && <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400 bg-white/10 border border-white/15 rounded-full px-1.5 py-0.5">Consumable</span>}
+                        {rx.recommended && <span className="text-[9px] font-bold uppercase tracking-wide text-ai-cyan bg-ai-cyan/10 border border-ai-cyan/25 rounded-full px-1.5 py-0.5">AI Recommended</span>}
                       </div>
                       <div className="text-slate-400 text-[11.5px]">{rx.route && rx.route !== "N/A" ? `${rx.route}, ` : ""}{rx.frequency}</div>
                     </div>
@@ -164,6 +183,33 @@ export default function PatientWorkspacePage() {
                 );
               })}
             </div>
+
+            {recommendedAdditions.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-ai-cyan mb-2.5">
+                  <FiZap size={12} /> Recommended Additions
+                </div>
+                <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+                  These aren&apos;t on the prescription, but this chart implies they&apos;ll be needed to actually administer it.
+                </p>
+                <div className="space-y-2">
+                  {recommendedAdditions.map((rec) => (
+                    <div key={rec.item} className="flex items-start justify-between gap-3 p-3 rounded-xl bg-ai-cyan/5 border border-ai-cyan/20">
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-semibold text-white">{rec.item}</div>
+                        <p className="text-[11.5px] text-slate-400 leading-relaxed mt-0.5">{rec.reason}</p>
+                      </div>
+                      <button
+                        onClick={() => addRecommended(rec)}
+                        className="shrink-0 flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-ai-cyan/40 text-ai-cyan bg-ai-cyan/10 hover:bg-ai-cyan/20 transition-colors"
+                      >
+                        <FiPlus size={11} /> Add
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </GlowCard>
         </div>
 
@@ -224,7 +270,7 @@ export default function PatientWorkspacePage() {
 
         {/* Automated cross-checks — always run */}
         <FadeIn>
-          <div className="grid sm:grid-cols-2 gap-5 mb-6">
+          <div className="grid sm:grid-cols-2 gap-5 mb-5">
             <GlowCard>
               <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2"><FiCopy className="text-ai-cyan" /> Duplicate Prescription Check</h3>
               {analysis.duplicateResults.length === 0 ? (
@@ -244,6 +290,26 @@ export default function PatientWorkspacePage() {
               )}
             </GlowCard>
 
+            <GlowCard>
+              <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2"><FiTarget className="text-warn" /> Dose Accuracy Check</h3>
+              {analysis.doseChecks.length === 0 ? (
+                <p className="text-[12.5px] text-slate-500">No new prescriptions matched against the local dosing reference.</p>
+              ) : (
+                <div className="space-y-2">
+                  {analysis.doseChecks.map((d, i) => (
+                    <div key={i} className={`flex items-start gap-2 p-2.5 rounded-lg border text-[12.5px] ${
+                      d.status === "ok" ? "bg-mint/5 border-mint/20 text-slate-300" : "bg-danger/5 border-danger/25 text-slate-300"
+                    }`}>
+                      {d.status === "ok" ? <FiCheckCircle className="text-mint shrink-0 mt-0.5" size={12} /> : <FiAlertTriangle className="text-danger shrink-0 mt-0.5" size={12} />}
+                      <span><span className="font-medium text-white">{d.drug} {d.dose}</span> — {d.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </GlowCard>
+          </div>
+
+          <div className="mb-6">
             <GlowCard>
               <h3 className="text-white font-bold text-sm mb-1 flex items-center gap-2"><FiActivity className="text-ai-violet" /> Interaction Cross-Check</h3>
               <p className="text-[11px] text-slate-500 mb-3">Every unique pair across current medications and new prescriptions — not just new-vs-current.</p>

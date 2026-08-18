@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FiMenu, FiX, FiMaximize, FiMinimize, FiFileText, FiZap, FiCpu,
   FiUser, FiHeart, FiAward, FiCamera, FiShare2, FiSliders, FiPackage,
-  FiAlertTriangle, FiActivity, FiAlertOctagon, FiCopy, FiDollarSign,
+  FiAlertTriangle, FiActivity, FiAlertOctagon, FiMessageCircle,
 } from "react-icons/fi";
 import { useApp } from "@/context/AppContext";
 
@@ -16,18 +16,17 @@ const MODULE_GROUPS = [
     items: [
       { href: "/cases", label: "Patient Assessment (Case Library)", icon: FiUser },
       { href: "/counseling", label: "Patient Counselling & Drug Reference", icon: FiHeart },
+      { href: "/training", label: "Pharmacy Training — Virtual Patient", icon: FiMessageCircle },
       { href: "/challenge", label: "AI vs Pharmacist", icon: FiAward },
       { href: "/scanner", label: "Prescription Scanner", icon: FiCamera },
       { href: "/interactions", label: "Interaction Visualizer", icon: FiShare2 },
-      { href: "/duplicate-check", label: "Duplicate Prescription Detection", icon: FiCopy },
-      { href: "/renal-calculator", label: "Renal Dose Calculator", icon: FiSliders },
+      { href: "/renal-calculator", label: "Renal Dose Calculator & Pharmacogenomics", icon: FiSliders },
     ],
   },
   {
     label: "Operations",
     items: [
-      { href: "/nhis-ops", label: "NHIS Billing, Errors & Queue", icon: FiDollarSign },
-      { href: "/theatre", label: "O&G & Theatre", icon: FiActivity },
+      { href: "/theatre", label: "Theatre", icon: FiActivity },
       { href: "/inventory", label: "Inventory Management", icon: FiPackage },
       { href: "/pharmacovigilance", label: "Pharmacovigilance", icon: FiAlertTriangle },
     ],
@@ -51,10 +50,11 @@ export default function NavBar() {
       <div className="flex items-center justify-between px-4 sm:px-6 py-3 glass-strong border-b border-white/10 flex-wrap gap-y-2">
         <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
           <span className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-ai-cyan to-ai-violet flex items-center justify-center text-[13px] font-bold text-slate-950 shadow-[0_0_0_1px_rgba(255,255,255,0.15)_inset] transition-transform group-hover:scale-105">
-            AI
+            P
           </span>
-          <span className="font-semibold text-sm tracking-wide hidden sm:block text-slate-100">
-            Clinical Pharmacy Assistant
+          <span className="hidden sm:flex items-baseline gap-1.5">
+            <span className="font-bold text-sm tracking-wide text-white">PhantomAI</span>
+            <span className="font-medium text-xs tracking-wide text-slate-400">Clinical Pharmacy Assistant</span>
           </span>
         </Link>
 

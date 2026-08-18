@@ -139,8 +139,8 @@ export default function TheatrePage() {
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-10">
         <BackButton label="Back to home" fallbackHref="/" />
         <PageHeader
-          eyebrow="O&G & Theatre Pharmacy"
-          title="Surgical Supply, Requests & Documentation"
+          eyebrow="Theatre Pharmacy"
+          title="Theatre — Supply, Requests & Documentation"
           subtitle="A live OR–pharmacy status board with per-case complication planning, a digital request system, and an NHIS payment tracker."
         />
 

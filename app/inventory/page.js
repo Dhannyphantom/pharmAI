@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
-  FiPackage, FiTrendingUp, FiZap, FiClock, FiClipboard, FiActivity, FiTruck, FiSearch, FiAlertTriangle, FiBarChart2,
+  FiPackage, FiTrendingUp, FiZap, FiClock, FiClipboard, FiActivity, FiTruck, FiSearch, FiAlertTriangle, FiBarChart2, FiCheckCircle,
 } from "react-icons/fi";
 import NavBar from "@/components/NavBar";
 import { PageHeader, GlowCard, FadeIn, PrimaryButton, LevelBar, SegmentedTabs, BackButton, LiveThinking, AIErrorNote, LiveModeNote } from "@/components/ui";
@@ -12,6 +12,7 @@ import {
   STOCK_VARIANCE, varianceOf, RECEIVING_RECORDS, CENTRAL_STOCK,
 } from "@/lib/bulkStoreData";
 import { computeLmis, LMIS_STATUS_STYLE } from "@/lib/lmis";
+import { computeForecast } from "@/lib/forecast";
 import { useApp } from "@/context/AppContext";
 import { askAI } from "@/lib/aiClient";
 
@@ -53,6 +54,12 @@ export default function InventoryPage() {
   const item = INVENTORY_ITEMS.find((i) => i.name === selected);
   const chartData = item.forecast.map((v, i) => ({ month: `M${i + 1}`, demand: v }));
   const stockPct = Math.max(0, Math.min(100, Math.round((item.stock / (item.reorderPoint * 2)) * 100)));
+  const forecast = useMemo(() => computeForecast(item), [item]);
+  const predictionChartData = [
+    ...forecast.history.map((v, i) => ({ month: `M-${forecast.history.length - i}`, actual: v, predicted: null })),
+    { month: "Today", actual: forecast.history[forecast.history.length - 1], predicted: forecast.history[forecast.history.length - 1] },
+    ...forecast.predicted.map((v, i) => ({ month: `M+${i + 1}`, actual: null, predicted: v })),
+  ];
 
   const sortedExpiry = useMemo(() => [...EXPIRY_ITEMS].sort((a, b) => a.daysToExpiry - b.daysToExpiry), []);
   const sortedVariance = useMemo(() => [...STOCK_VARIANCE].sort((a, b) => Math.abs(varianceOf(b)) - Math.abs(varianceOf(a))), []);
@@ -66,7 +73,7 @@ export default function InventoryPage() {
     setLiveError(null); setLiveLoading(true); setLiveText(null);
     try {
       const text = await askAI(
-        `Medicine: ${item.name}\nCurrent stock: ${item.stock}\nReorder point: ${item.reorderPoint}\nExpiry: ${item.expiry}\n6-month demand forecast: ${item.forecast.join(", ")}\nRisk rating: ${item.risk}`,
+        `Medicine: ${item.name}\nCurrent stock: ${item.stock}\nReorder point: ${item.reorderPoint}\nExpiry: ${item.expiry}\nPast 6 months actual consumption: ${forecast.history.join(", ")}\nPredicted next 6 months demand: ${forecast.predicted.join(", ")}\nPredicted stockout month: ${forecast.stockoutMonth ?? "none within 6 months"}\nRisk rating: ${item.risk}`,
         { system: INVENTORY_SYSTEM_PROMPT, maxTokens: 250 }
       );
       setLiveText(text);
@@ -166,23 +173,36 @@ export default function InventoryPage() {
               <GlowCard>
                 <div className="flex items-center gap-2 mb-1">
                   <FiTrendingUp className="text-ai-cyan" />
-                  <h3 className="text-white font-bold text-sm">{item.name} — 6-Month Demand Forecast</h3>
+                  <h3 className="text-white font-bold text-sm">{item.name} — Predicted Demand, Next 6 Months</h3>
                 </div>
-                <p className="text-[12px] text-slate-500 mb-4">Reorder point: {item.reorderPoint} units</p>
+                <p className="text-[12px] text-slate-500 mb-4">
+                  Reorder point: {item.reorderPoint} units · trend from trailing consumption: {forecast.trend >= 0 ? "+" : ""}{(forecast.trend * 100).toFixed(1)}%/mo
+                </p>
                 <div className="mb-5">
                   <LevelBar percent={stockPct} color={RISK_BAR_COLOR[item.risk]} label="Current Stock Level" value={`${item.stock} units`} />
                 </div>
                 <div className="h-56">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
+                    <LineChart data={predictionChartData}>
                       <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
                       <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
                       <YAxis stroke="#64748b" fontSize={11} />
                       <Tooltip contentStyle={{ background: "#0B1730", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, fontSize: 12 }} />
-                      <Line type="monotone" dataKey="demand" stroke="#22D3EE" strokeWidth={2.5} dot={{ r: 3, fill: "#22D3EE" }} />
+                      <Line type="monotone" dataKey="actual" name="Actual (past 6mo)" stroke="#64748b" strokeWidth={2} strokeDasharray="4 3" dot={{ r: 2.5, fill: "#64748b" }} connectNulls />
+                      <Line type="monotone" dataKey="predicted" name="Predicted (next 6mo)" stroke="#22D3EE" strokeWidth={2.5} dot={{ r: 3, fill: "#22D3EE" }} connectNulls />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
+
+                {forecast.stockoutMonth ? (
+                  <div className="mt-3 p-3 rounded-lg bg-danger/10 border border-danger/25 text-[12.5px] text-danger flex items-center gap-2">
+                    <FiAlertTriangle size={14} className="shrink-0" /> Stockout predicted in Month {forecast.stockoutMonth} if current consumption trend and stock levels continue — reorder now.
+                  </div>
+                ) : (
+                  <div className="mt-3 p-3 rounded-lg bg-mint/10 border border-mint/25 text-[12.5px] text-mint flex items-center gap-2">
+                    <FiCheckCircle size={14} className="shrink-0" /> No stockout predicted within the next 6 months at the current trend.
+                  </div>
+                )}
                 {item.risk !== "Low" && (
                   <div className="mt-3 p-3 rounded-lg bg-warn/10 border border-warn/25 text-[12.5px] text-warn flex items-center gap-2">
                     <FiPackage size={14} /> AI Suggestion: reorder {Math.max(item.reorderPoint * 2 - item.stock, 100)} units within the next cycle.

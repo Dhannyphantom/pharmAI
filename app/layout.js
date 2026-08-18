@@ -4,7 +4,7 @@ import Disclaimer from "@/components/Disclaimer";
 import NeuralBackground from "@/components/NeuralBackground";
 
 export const metadata = {
-  title: "AI Clinical Pharmacy Assistant — Educational Demonstration",
+  title: "PhantomAI: The Clinical Pharmacy Assistant — Educational Demonstration",
   description: "Applications of AI in Current Pharmacy Practice and Patient Care",
 };
 
