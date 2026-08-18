@@ -276,9 +276,10 @@ export function Modal({ open, onClose, title, eyebrow, children, wide = false })
 export function FadeIn({ children, delay = 0, className = "", y = 12 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, y, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }}
+      style={{ willChange: "opacity, transform" }}
       className={className}
     >
       {children}

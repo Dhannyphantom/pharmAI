@@ -2,17 +2,17 @@
 import { useState, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
-  FiPackage, FiTrendingUp, FiZap, FiClock, FiClipboard, FiActivity, FiTruck, FiSearch, FiAlertTriangle, FiBarChart2, FiCheckCircle,
+  FiPackage, FiTrendingUp, FiZap, FiClock, FiClipboard, FiActivity, FiTruck, FiSearch, FiAlertTriangle, FiBarChart2, FiCheckCircle, FiHome,
 } from "react-icons/fi";
 import NavBar from "@/components/NavBar";
 import { PageHeader, GlowCard, FadeIn, PrimaryButton, LevelBar, SegmentedTabs, BackButton, LiveThinking, AIErrorNote, LiveModeNote } from "@/components/ui";
-import { INVENTORY_ITEMS } from "@/lib/miscData";
 import {
   EXPIRY_ITEMS, expiryRisk, REQUISITIONS, requisitionFlag,
   STOCK_VARIANCE, varianceOf, RECEIVING_RECORDS, CENTRAL_STOCK,
 } from "@/lib/bulkStoreData";
 import { computeLmis, LMIS_STATUS_STYLE } from "@/lib/lmis";
 import { computeForecast } from "@/lib/forecast";
+import { UNITS, getUnitInventory, computeRisk } from "@/lib/unitInventory";
 import { useApp } from "@/context/AppContext";
 import { askAI } from "@/lib/aiClient";
 
@@ -42,8 +42,10 @@ const INVENTORY_SYSTEM_PROMPT = `You are a hospital pharmacy inventory analyst A
 const SEARCH_SYSTEM_PROMPT = `You are a natural-language inventory search assistant for a hospital pharmacy education demo. Given unit-level and central-store inventory (JSON) and a natural-language question, answer directly and concisely (under 80 words) using only the data provided. Plain text, no markdown, no JSON.`;
 
 export default function InventoryPage() {
+  const [unit, setUnit] = useState(UNITS[0]);
   const [tab, setTab] = useState("unit");
-  const [selected, setSelected] = useState(INVENTORY_ITEMS[0].name);
+  const unitItems = useMemo(() => getUnitInventory(unit), [unit]);
+  const [selected, setSelected] = useState(unitItems[0].name);
   const [liveText, setLiveText] = useState(null);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState(null);
@@ -51,8 +53,8 @@ export default function InventoryPage() {
   const [liveAnswer, setLiveAnswer] = useState(null);
   const { liveMode } = useApp();
 
-  const item = INVENTORY_ITEMS.find((i) => i.name === selected);
-  const chartData = item.forecast.map((v, i) => ({ month: `M${i + 1}`, demand: v }));
+  const item = unitItems.find((i) => i.name === selected) || unitItems[0];
+  const itemRisk = computeRisk(item);
   const stockPct = Math.max(0, Math.min(100, Math.round((item.stock / (item.reorderPoint * 2)) * 100)));
   const forecast = useMemo(() => computeForecast(item), [item]);
   const predictionChartData = [
@@ -64,16 +66,23 @@ export default function InventoryPage() {
   const sortedExpiry = useMemo(() => [...EXPIRY_ITEMS].sort((a, b) => a.daysToExpiry - b.daysToExpiry), []);
   const sortedVariance = useMemo(() => [...STOCK_VARIANCE].sort((a, b) => Math.abs(varianceOf(b)) - Math.abs(varianceOf(a))), []);
   const filteredInventory = useMemo(() => {
-    if (!searchQuery.trim()) return INVENTORY_ITEMS;
+    if (!searchQuery.trim()) return unitItems;
     const q = searchQuery.trim().toLowerCase();
-    return INVENTORY_ITEMS.filter((i) => i.name.toLowerCase().includes(q) || i.risk.toLowerCase().includes(q));
-  }, [searchQuery]);
+    return unitItems.filter((i) => i.name.toLowerCase().includes(q) || computeRisk(i).toLowerCase().includes(q));
+  }, [searchQuery, unitItems]);
+
+  function changeUnit(u) {
+    setUnit(u);
+    const items = getUnitInventory(u);
+    setSelected(items[0].name);
+    setLiveText(null);
+  }
 
   async function interpret() {
     setLiveError(null); setLiveLoading(true); setLiveText(null);
     try {
       const text = await askAI(
-        `Medicine: ${item.name}\nCurrent stock: ${item.stock}\nReorder point: ${item.reorderPoint}\nExpiry: ${item.expiry}\nPast 6 months actual consumption: ${forecast.history.join(", ")}\nPredicted next 6 months demand: ${forecast.predicted.join(", ")}\nPredicted stockout month: ${forecast.stockoutMonth ?? "none within 6 months"}\nRisk rating: ${item.risk}`,
+        `Unit: ${unit}\nMedicine: ${item.name}\nCurrent stock: ${item.stock}\nReorder point: ${item.reorderPoint}\nExpiry: ${item.expiry}\nPast 6 months actual consumption: ${forecast.history.join(", ")}\nPredicted next 6 months demand: ${forecast.predicted.join(", ")}\nPredicted stockout month: ${forecast.stockoutMonth ?? "none within 6 months"}\nRisk rating: ${itemRisk}`,
         { system: INVENTORY_SYSTEM_PROMPT, maxTokens: 250 }
       );
       setLiveText(text);
@@ -85,7 +94,7 @@ export default function InventoryPage() {
     setLiveError(null); setLiveLoading(true); setLiveAnswer(null);
     try {
       const text = await askAI(
-        `Unit stock: ${JSON.stringify(INVENTORY_ITEMS)}\nCentral store stock: ${JSON.stringify(CENTRAL_STOCK)}\n\nQuestion: ${searchQuery.trim()}`,
+        `Unit: ${unit}\nUnit stock: ${JSON.stringify(unitItems)}\nCentral store stock: ${JSON.stringify(CENTRAL_STOCK)}\n\nQuestion: ${searchQuery.trim()}`,
         { system: SEARCH_SYSTEM_PROMPT, maxTokens: 220 }
       );
       setLiveAnswer(text);
@@ -100,8 +109,24 @@ export default function InventoryPage() {
         <PageHeader
           eyebrow="Inventory Management"
           title="Unit & Central Stock Intelligence"
-          subtitle="Demand forecasting and full LMIS analysis for this unit, plus the shared Bulk Store tools: expiry monitoring, requisition anomalies, stock variance and receiving checks, and natural-language search."
+          subtitle="Demand forecasting and full LMIS analysis per unit, plus the shared Bulk Store tools: expiry monitoring, requisition anomalies, stock variance and receiving checks, and natural-language search."
         />
+
+        {/* Unit selector */}
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mr-1 shrink-0"><FiHome size={12} /> Unit:</div>
+          {UNITS.map((u) => (
+            <button
+              key={u}
+              onClick={() => changeUnit(u)}
+              className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                unit === u ? "bg-gradient-to-r from-hospital-blue to-ai-violet text-white border-transparent glow-blue" : "border-white/12 text-slate-300 hover:border-white/25 hover:bg-white/5"
+              }`}
+            >
+              {u}
+            </button>
+          ))}
+        </div>
 
         <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
 
@@ -109,7 +134,7 @@ export default function InventoryPage() {
           <>
             <FadeIn>
               <GlowCard className="mb-6 overflow-x-auto">
-                <h3 className="text-white font-bold text-sm mb-1 flex items-center gap-2"><FiBarChart2 className="text-ai-violet" /> LMIS Overview — This Unit</h3>
+                <h3 className="text-white font-bold text-sm mb-1 flex items-center gap-2"><FiBarChart2 className="text-ai-violet" /> LMIS Overview — {unit}</h3>
                 <p className="text-[11.5px] text-slate-500 mb-4">Average Monthly Consumption (AMC), Reorder Level (ROL), safety/max stock, and months of stock (MOS) remaining, with a recommendation per item.</p>
                 <table className="w-full text-sm">
                   <thead>
@@ -125,7 +150,7 @@ export default function InventoryPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {INVENTORY_ITEMS.map((i) => {
+                    {unitItems.map((i) => {
                       const lmis = computeLmis(i);
                       return (
                         <tr key={i.name} className="border-b border-white/5 align-top">
@@ -148,83 +173,86 @@ export default function InventoryPage() {
             </FadeIn>
 
             <div className="grid lg:grid-cols-[1fr_1.1fr] gap-6">
-            <GlowCard className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wide text-slate-500 border-b border-white/10">
-                    <th className="pb-2 pr-3">Medicine</th><th className="pb-2 pr-3">Stock</th><th className="pb-2 pr-3">Expiry</th><th className="pb-2">Risk</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {INVENTORY_ITEMS.map((i) => (
-                    <tr key={i.name} onClick={() => { setSelected(i.name); setLiveText(null); }}
-                      className={`cursor-pointer border-b border-white/5 hover:bg-white/[0.04] transition-colors ${selected === i.name ? "bg-ai-cyan/5" : ""}`}>
-                      <td className="py-2.5 pr-3 text-slate-200 font-medium">{i.name}</td>
-                      <td className={`py-2.5 pr-3 tabular-nums ${i.stock < i.reorderPoint ? "text-warn font-semibold" : "text-slate-300"}`}>{i.stock}</td>
-                      <td className="py-2.5 pr-3 text-slate-400 tabular-nums">{i.expiry}</td>
-                      <td className="py-2.5"><span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${RISK_STYLES[i.risk]}`}>{i.risk}</span></td>
+              <GlowCard className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wide text-slate-500 border-b border-white/10">
+                      <th className="pb-2 pr-3">Medicine</th><th className="pb-2 pr-3">Stock</th><th className="pb-2 pr-3">Expiry</th><th className="pb-2">Risk</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </GlowCard>
-
-            <FadeIn>
-              <GlowCard>
-                <div className="flex items-center gap-2 mb-1">
-                  <FiTrendingUp className="text-ai-cyan" />
-                  <h3 className="text-white font-bold text-sm">{item.name} — Predicted Demand, Next 6 Months</h3>
-                </div>
-                <p className="text-[12px] text-slate-500 mb-4">
-                  Reorder point: {item.reorderPoint} units · trend from trailing consumption: {forecast.trend >= 0 ? "+" : ""}{(forecast.trend * 100).toFixed(1)}%/mo
-                </p>
-                <div className="mb-5">
-                  <LevelBar percent={stockPct} color={RISK_BAR_COLOR[item.risk]} label="Current Stock Level" value={`${item.stock} units`} />
-                </div>
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={predictionChartData}>
-                      <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                      <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
-                      <YAxis stroke="#64748b" fontSize={11} />
-                      <Tooltip contentStyle={{ background: "#0B1730", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, fontSize: 12 }} />
-                      <Line type="monotone" dataKey="actual" name="Actual (past 6mo)" stroke="#64748b" strokeWidth={2} strokeDasharray="4 3" dot={{ r: 2.5, fill: "#64748b" }} connectNulls />
-                      <Line type="monotone" dataKey="predicted" name="Predicted (next 6mo)" stroke="#22D3EE" strokeWidth={2.5} dot={{ r: 3, fill: "#22D3EE" }} connectNulls />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {forecast.stockoutMonth ? (
-                  <div className="mt-3 p-3 rounded-lg bg-danger/10 border border-danger/25 text-[12.5px] text-danger flex items-center gap-2">
-                    <FiAlertTriangle size={14} className="shrink-0" /> Stockout predicted in Month {forecast.stockoutMonth} if current consumption trend and stock levels continue — reorder now.
-                  </div>
-                ) : (
-                  <div className="mt-3 p-3 rounded-lg bg-mint/10 border border-mint/25 text-[12.5px] text-mint flex items-center gap-2">
-                    <FiCheckCircle size={14} className="shrink-0" /> No stockout predicted within the next 6 months at the current trend.
-                  </div>
-                )}
-                {item.risk !== "Low" && (
-                  <div className="mt-3 p-3 rounded-lg bg-warn/10 border border-warn/25 text-[12.5px] text-warn flex items-center gap-2">
-                    <FiPackage size={14} /> AI Suggestion: reorder {Math.max(item.reorderPoint * 2 - item.stock, 100)} units within the next cycle.
-                  </div>
-                )}
-                {liveMode && (
-                  <div className="mt-4 pt-4 border-t border-white/10">
-                    <PrimaryButton onClick={interpret} disabled={liveLoading} className="flex items-center gap-2 mb-3">
-                      <FiZap size={14} /> Ask Live AI to Interpret This
-                    </PrimaryButton>
-                    {liveLoading && <LiveThinking label="Analyzing with Claude..." />}
-                    {liveError && <AIErrorNote message={liveError} onRetry={interpret} />}
-                    {liveText && (
-                      <FadeIn>
-                        <LiveModeNote>Live AI Mode — generated by Claude, not scripted</LiveModeNote>
-                        <p className="text-[13px] text-slate-200 leading-relaxed p-3 rounded-lg bg-ai-cyan/5 border border-ai-cyan/20">{liveText}</p>
-                      </FadeIn>
-                    )}
-                  </div>
-                )}
+                  </thead>
+                  <tbody>
+                    {unitItems.map((i) => {
+                      const r = computeRisk(i);
+                      return (
+                        <tr key={i.name} onClick={() => { setSelected(i.name); setLiveText(null); }}
+                          className={`cursor-pointer border-b border-white/5 hover:bg-white/[0.04] transition-colors ${selected === i.name ? "bg-ai-cyan/5" : ""}`}>
+                          <td className="py-2.5 pr-3 text-slate-200 font-medium">{i.name}</td>
+                          <td className={`py-2.5 pr-3 tabular-nums ${i.stock < i.reorderPoint ? "text-warn font-semibold" : "text-slate-300"}`}>{i.stock}</td>
+                          <td className="py-2.5 pr-3 text-slate-400 tabular-nums">{i.expiry}</td>
+                          <td className="py-2.5"><span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${RISK_STYLES[r]}`}>{r}</span></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </GlowCard>
-            </FadeIn>
+
+              <FadeIn>
+                <GlowCard>
+                  <div className="flex items-center gap-2 mb-1">
+                    <FiTrendingUp className="text-ai-cyan" />
+                    <h3 className="text-white font-bold text-sm">{item.name} — Predicted Demand, Next 6 Months</h3>
+                  </div>
+                  <p className="text-[12px] text-slate-500 mb-4">
+                    {unit} · Reorder point: {item.reorderPoint} units · trend: {forecast.trend >= 0 ? "+" : ""}{(forecast.trend * 100).toFixed(1)}%/mo
+                  </p>
+                  <div className="mb-5">
+                    <LevelBar percent={stockPct} color={RISK_BAR_COLOR[itemRisk]} label="Current Stock Level" value={`${item.stock} units`} />
+                  </div>
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={predictionChartData}>
+                        <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                        <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
+                        <YAxis stroke="#64748b" fontSize={11} />
+                        <Tooltip contentStyle={{ background: "#0B1730", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, fontSize: 12 }} />
+                        <Line type="monotone" dataKey="actual" name="Actual (past 6mo)" stroke="#64748b" strokeWidth={2} strokeDasharray="4 3" dot={{ r: 2.5, fill: "#64748b" }} connectNulls />
+                        <Line type="monotone" dataKey="predicted" name="Predicted (next 6mo)" stroke="#22D3EE" strokeWidth={2.5} dot={{ r: 3, fill: "#22D3EE" }} connectNulls />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {forecast.stockoutMonth ? (
+                    <div className="mt-3 p-3 rounded-lg bg-danger/10 border border-danger/25 text-[12.5px] text-danger flex items-center gap-2">
+                      <FiAlertTriangle size={14} className="shrink-0" /> Stockout predicted in Month {forecast.stockoutMonth} if current consumption trend and stock levels continue — reorder now.
+                    </div>
+                  ) : (
+                    <div className="mt-3 p-3 rounded-lg bg-mint/10 border border-mint/25 text-[12.5px] text-mint flex items-center gap-2">
+                      <FiCheckCircle size={14} className="shrink-0" /> No stockout predicted within the next 6 months at the current trend.
+                    </div>
+                  )}
+                  {itemRisk !== "Low" && (
+                    <div className="mt-3 p-3 rounded-lg bg-warn/10 border border-warn/25 text-[12.5px] text-warn flex items-center gap-2">
+                      <FiPackage size={14} /> AI Suggestion: reorder {Math.max(item.reorderPoint * 2 - item.stock, 100)} units within the next cycle.
+                    </div>
+                  )}
+                  {liveMode && (
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <PrimaryButton onClick={interpret} disabled={liveLoading} className="flex items-center gap-2 mb-3">
+                        <FiZap size={14} /> Ask Live AI to Interpret This
+                      </PrimaryButton>
+                      {liveLoading && <LiveThinking label="Analyzing with Claude..." />}
+                      {liveError && <AIErrorNote message={liveError} onRetry={interpret} />}
+                      {liveText && (
+                        <FadeIn>
+                          <LiveModeNote>Live AI Mode — generated by Claude, not scripted</LiveModeNote>
+                          <p className="text-[13px] text-slate-200 leading-relaxed p-3 rounded-lg bg-ai-cyan/5 border border-ai-cyan/20">{liveText}</p>
+                        </FadeIn>
+                      )}
+                    </div>
+                  )}
+                </GlowCard>
+              </FadeIn>
             </div>
           </>
         )}
@@ -352,7 +380,7 @@ export default function InventoryPage() {
         {tab === "search" && (
           <FadeIn>
             <GlowCard className="mb-6">
-              <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2"><FiSearch className="text-ai-cyan" /> Smart Inventory Search</h3>
+              <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2"><FiSearch className="text-ai-cyan" /> Smart Inventory Search — {unit}</h3>
               <div className="flex flex-col sm:flex-row gap-2 mb-2">
                 <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && liveMode && runLiveSearch()}
@@ -365,7 +393,7 @@ export default function InventoryPage() {
                 )}
               </div>
               <p className="text-[11.5px] text-slate-500">
-                {liveMode ? "Ask Claude a natural-language question across unit and central store inventory." : "Instant keyword filter over the unit formulary. Switch on Live AI Mode to ask natural-language questions."}
+                {liveMode ? "Ask Claude a natural-language question across this unit's and central store inventory." : "Instant keyword filter over this unit's formulary. Switch on Live AI Mode to ask natural-language questions."}
               </p>
             </GlowCard>
 
@@ -396,7 +424,7 @@ export default function InventoryPage() {
                           <td className={`py-2.5 pr-3 tabular-nums ${central && central.qty < central.reorderPoint ? "text-warn font-semibold" : "text-slate-300"}`}>
                             {central ? central.qty : "—"}
                           </td>
-                          <td className="py-2.5 text-slate-300">{i.risk}</td>
+                          <td className="py-2.5 text-slate-300">{computeRisk(i)}</td>
                         </tr>
                       );
                     })}

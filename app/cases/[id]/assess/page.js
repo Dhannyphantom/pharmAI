@@ -56,7 +56,7 @@ export default function AssessCase() {
   const { id } = useParams();
   const router = useRouter();
   const patientCase = getCaseById(id);
-  const { presenterNotes, liveMode } = useApp();
+  const { liveMode } = useApp();
   const [stage, setStage] = useState("chart"); // chart -> scanning -> report -> recommendation
   const [celebrate, setCelebrate] = useState(false);
   const [liveReport, setLiveReport] = useState(null);
@@ -179,13 +179,6 @@ export default function AssessCase() {
               <div className="text-slate-400 text-[12.5px] leading-relaxed">{c.clinicalNotes}</div>
             </div>
           </div>
-
-          {presenterNotes && (
-            <div className="mt-5 p-3 rounded-lg bg-ai-violet/10 border border-ai-violet/25 text-[12px] text-slate-300">
-              <span className="font-semibold text-ai-violet">Presenter note:</span> Hidden problem category — {" "}
-              {c.aiReport.interactions[0]?.severity} interaction. Give the audience time before revealing.
-            </div>
-          )}
         </GlowCard>
 
         {/* STAGE: chart -> ask audience */}

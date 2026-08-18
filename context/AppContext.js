@@ -4,7 +4,6 @@ import { createContext, useContext, useState, useCallback, useEffect } from "rea
 const AppCtx = createContext(null);
 
 export function AppProvider({ children }) {
-  const [presenterNotes, setPresenterNotes] = useState(false);
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [liveMode, setLiveModeState] = useState(() => {
@@ -45,7 +44,6 @@ export function AppProvider({ children }) {
   useEffect(() => {
     function onKey(e) {
       if (e.key === "f" || e.key === "F") toggleFullscreen();
-      if (e.key === "p" || e.key === "P") setPresenterNotes((v) => !v);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -54,7 +52,6 @@ export function AppProvider({ children }) {
   return (
     <AppCtx.Provider
       value={{
-        presenterNotes, setPresenterNotes,
         score, addScore, resetScore,
         isFullscreen, toggleFullscreen,
         liveMode, setLiveMode,

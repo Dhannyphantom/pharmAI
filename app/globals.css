@@ -35,6 +35,7 @@
 }
 
 html, body { height: 100%; }
+html { scroll-behavior: smooth; }
 
 * { scrollbar-color: rgba(148,163,184,0.3) transparent; }
 

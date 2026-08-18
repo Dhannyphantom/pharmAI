@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  FiMenu, FiX, FiMaximize, FiMinimize, FiFileText, FiZap, FiCpu,
+  FiMenu, FiX, FiMaximize, FiMinimize, FiZap, FiCpu,
   FiUser, FiHeart, FiAward, FiCamera, FiShare2, FiSliders, FiPackage,
   FiAlertTriangle, FiActivity, FiAlertOctagon, FiMessageCircle,
 } from "react-icons/fi";
@@ -43,7 +43,7 @@ const MODULE_GROUPS = [
 export default function NavBar() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const { isFullscreen, toggleFullscreen, presenterNotes, setPresenterNotes, liveMode, setLiveMode } = useApp();
+  const { isFullscreen, toggleFullscreen, liveMode, setLiveMode } = useApp();
 
   return (
     <div className="sticky top-0 z-40">
@@ -93,17 +93,6 @@ export default function NavBar() {
             {liveMode ? "Live AI Mode" : "Simulated Mode"}
           </button>
 
-          <button
-            onClick={() => setPresenterNotes(!presenterNotes)}
-            title="Toggle presenter notes (P)"
-            className={`hidden md:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-              presenterNotes
-                ? "border-ai-cyan/50 text-ai-cyan bg-ai-cyan/10"
-                : "border-white/10 text-slate-400 hover:text-slate-200 hover:border-white/20"
-            }`}
-          >
-            <FiFileText size={13} /> Presenter Notes
-          </button>
           <button
             onClick={toggleFullscreen}
             title="Toggle fullscreen (F)"

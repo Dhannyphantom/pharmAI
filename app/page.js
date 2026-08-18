@@ -45,7 +45,6 @@ export default function Home() {
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.15 }}>
-          <div className="text-eyebrow justify-center mb-3">Educational Demonstration</div>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-4 tracking-tight">
             Phantom<span className="text-gradient">AI</span>
           </h1>
@@ -68,8 +67,13 @@ export default function Home() {
             <GlowCard interactive glow="glow-violet" className="border-ai-violet/30 text-left py-7">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-ai-violet/15 border border-ai-violet/30 flex items-center justify-center text-ai-violet shrink-0">
+                  <div className="relative w-12 h-12 rounded-2xl bg-ai-violet/15 border border-ai-violet/30 flex items-center justify-center text-ai-violet shrink-0">
                     <FiUser size={22} />
+                    <motion.div
+                      className="absolute inset-0 rounded-2xl border border-ai-violet/50"
+                      animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
+                      transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                    />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">

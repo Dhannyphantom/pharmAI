@@ -9,11 +9,14 @@ import {
   FiArrowRight, FiSend, FiFilter, FiPlus, FiZap,
 } from "react-icons/fi";
 import NavBar from "@/components/NavBar";
-import { PageHeader, GlowCard, FadeIn, StaggerList, SeverityPill, ProgressRing, GhostButton, PrimaryButton, BackButton } from "@/components/ui";
+import { PageHeader, GlowCard, FadeIn, StaggerList, SeverityPill, ProgressRing, GhostButton, PrimaryButton, BackButton, LiveModeNote, AIErrorNote } from "@/components/ui";
 import { getPatientByPid, getPatientAnalysis } from "@/lib/patients";
 import { getProcedureById } from "@/lib/surgicalData";
 import { LMIS_STATUS_STYLE } from "@/lib/lmis";
 import { getRecommendedAdditions } from "@/lib/prescriptionRecommendations";
+import { computePaymentRisk, PAYMENT_RISK_STYLE } from "@/lib/paymentRisk";
+import { useApp } from "@/context/AppContext";
+import { askAI } from "@/lib/aiClient";
 
 const ACTION_META = {
   Dispense: { icon: FiCheckCircle, color: "text-mint", bg: "bg-mint/10 border-mint/30" },
@@ -33,6 +36,7 @@ const BILLING_UNITS = ["A&E", "NHIS Pharmacy", "In-Patient", "GOPD Pharmacy", "P
 
 export default function PatientWorkspacePage() {
   const { pid } = useParams();
+  const { liveMode } = useApp();
   const patient = getPatientByPid(decodeURIComponent(pid));
   const [dispensed, setDispensed] = useState({});
   const [prescriptions, setPrescriptions] = useState(patient?.newPrescriptions || []);
@@ -41,6 +45,42 @@ export default function PatientWorkspacePage() {
   const [billingStatusFilter, setBillingStatusFilter] = useState("All");
   const [billingUnitFilter, setBillingUnitFilter] = useState("All");
   const [billingSort, setBillingSort] = useState("date-desc");
+  const [reminderText, setReminderText] = useState(null);
+  const [reminderLoading, setReminderLoading] = useState(false);
+  const [reminderError, setReminderError] = useState(null);
+
+  const paymentRisk = useMemo(() => computePaymentRisk(patient?.billingHistory || []), [patient]);
+
+  async function draftReminder() {
+    setReminderError(null);
+    setReminderLoading(true);
+    setReminderText(null);
+    const outstanding = (patient.billingHistory || []).filter((b) => b.status !== "Paid");
+    if (!liveMode) {
+      // Simulated Mode — scripted template, no API call.
+      setTimeout(() => {
+        setReminderText(
+          `Dear ${patient.name}, this is a reminder that ${outstanding.length} item(s) totaling ₦${paymentRisk.outstandingTotal.toLocaleString()} on your pharmacy account remain unpaid. Please settle this at your earliest convenience, or speak with our billing desk if you need a payment plan or NHIS coverage confirmed. Thank you.`
+        );
+        setReminderLoading(false);
+      }, 500);
+      return;
+    }
+    try {
+      const text = await askAI(
+        `Patient: ${patient.name}\nOutstanding items: ${outstanding.map((b) => `${b.item} (₦${b.amount}, ${b.status})`).join("; ")}\nTotal outstanding: ₦${paymentRisk.outstandingTotal}\nPayment risk level: ${paymentRisk.level}`,
+        {
+          system: "You are drafting a short, polite payment reminder message from a hospital pharmacy billing desk to a patient, for a pharmacy education demo. Under 80 words. Firm but courteous — no threats, mention the option of a payment plan or NHIS coverage check. Plain text, no markdown.",
+          maxTokens: 200,
+        }
+      );
+      setReminderText(text);
+    } catch (e) {
+      setReminderError(e.message);
+    } finally {
+      setReminderLoading(false);
+    }
+  }
 
   // Reset local prescription state if the person navigates from one patient
   // straight to another without a full page reload.
@@ -404,6 +444,46 @@ export default function PatientWorkspacePage() {
 
         {showBilling && (
           <FadeIn>
+            <GlowCard className="mb-4 border-ai-cyan/20">
+              <div className="flex items-center gap-2 mb-3">
+                <FiZap className="text-ai-cyan" size={15} />
+                <h3 className="text-white font-bold text-sm">AI Payment Risk</h3>
+              </div>
+              <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-3xl font-bold text-white tabular-nums">{paymentRisk.score}</span>
+                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${PAYMENT_RISK_STYLE[paymentRisk.level]}`}>{paymentRisk.level} Risk</span>
+                  </div>
+                  <p className="text-[12px] text-slate-500">Outstanding: <span className="text-slate-300 tabular-nums">₦{paymentRisk.outstandingTotal.toLocaleString()}</span></p>
+                </div>
+                <div className="w-full sm:w-auto sm:max-w-xs">
+                  <ul className="space-y-1">
+                    {paymentRisk.factors.map((f) => (
+                      <li key={f} className="text-[11.5px] text-slate-400 flex items-start gap-1.5"><span className="mt-1 w-1 h-1 rounded-full bg-slate-500 shrink-0" />{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <div className={`p-3 rounded-lg border text-[12.5px] mb-3 ${PAYMENT_RISK_STYLE[paymentRisk.level]}`}>
+                {paymentRisk.recommendation}
+              </div>
+              {paymentRisk.level !== "Low" && (
+                <>
+                  <GhostButton onClick={draftReminder} disabled={reminderLoading} className="flex items-center gap-2 text-xs">
+                    {liveMode && <FiZap size={12} />} {reminderLoading ? "Drafting..." : "Draft Payment Reminder"}
+                  </GhostButton>
+                  {reminderError && <div className="mt-2"><AIErrorNote message={reminderError} onRetry={draftReminder} /></div>}
+                  {reminderText && (
+                    <FadeIn>
+                      {liveMode && <div className="mt-2"><LiveModeNote>Live AI Mode — generated by Claude, not scripted</LiveModeNote></div>}
+                      <p className="mt-2 text-[12.5px] text-slate-300 leading-relaxed p-3 rounded-lg bg-white/[0.03] border border-white/10 whitespace-pre-line">{reminderText}</p>
+                    </FadeIn>
+                  )}
+                </>
+              )}
+            </GlowCard>
+
             <GlowCard className="mb-6">
               <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2"><FiDollarSign className="text-warn" /> Billing History</h3>
 
