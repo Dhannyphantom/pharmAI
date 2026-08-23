@@ -6,7 +6,7 @@ import {
   FiUser, FiAlertTriangle, FiCopy, FiActivity, FiShield,
   FiCheckCircle, FiXCircle, FiPhoneCall, FiEye, FiDollarSign, FiCamera,
   FiHeart, FiPackage, FiTarget, FiPercent, FiClock, FiChevronDown, FiChevronUp,
-  FiArrowRight, FiSend, FiFilter, FiPlus, FiZap,
+  FiArrowRight, FiSend, FiFilter, FiPlus, FiZap, FiHome,
 } from "react-icons/fi";
 import NavBar from "@/components/NavBar";
 import { PageHeader, GlowCard, FadeIn, StaggerList, SeverityPill, ProgressRing, GhostButton, PrimaryButton, BackButton, LiveModeNote, AIErrorNote } from "@/components/ui";
@@ -17,6 +17,7 @@ import { getRecommendedAdditions } from "@/lib/prescriptionRecommendations";
 import { computePaymentRisk, PAYMENT_RISK_STYLE } from "@/lib/paymentRisk";
 import { useApp } from "@/context/AppContext";
 import { askAI } from "@/lib/aiClient";
+import SectionNav from "@/components/SectionNav";
 
 const ACTION_META = {
   Dispense: { icon: FiCheckCircle, color: "text-mint", bg: "bg-mint/10 border-mint/30" },
@@ -130,14 +131,43 @@ export default function PatientWorkspacePage() {
   const ActionIcon = actionMeta?.icon;
   const procedure = analysis.theatreRequest ? getProcedureById(analysis.theatreRequest.procedureId) : null;
 
+  // Drug name → inventory record, so each prescription row in Medications
+  // can show unit stock, central stock, and auto-reorder status inline
+  // without repeating the full lookup/LMIS logic used for the bottom
+  // Inventory nudge section.
+  const inventoryByDrug = Object.fromEntries(analysis.inventoryFlags.map((f) => [f.drug.toLowerCase(), f]));
+  const REORDER_TRIGGER_STATUSES = ["Below Reorder Level", "Below Safety Stock", "Stockout"];
+
+  // Quick Jump sections — only include entries for content that actually
+  // exists on this patient's chart. Billing/Counselling are collapsed by
+  // default, so their nav items expand the panel (onActivate) before
+  // scrolling to it.
+  const sections = [
+    { id: "overview", label: "Overview", icon: FiUser },
+    { id: "medications", label: "Medications", icon: FiActivity },
+    ...(patient.aiReport ? [{ id: "clinical-analysis", label: "AI Analysis", icon: FiZap }] : []),
+    { id: "checks", label: "Cross-Checks", icon: FiCopy },
+    ...((analysis.renal || analysis.relevantReports.length > 0 || analysis.relevantSignal)
+      ? [{ id: "renal-pv", label: "Renal & ADR", icon: FiTarget }]
+      : []),
+    { id: "billing", label: "Billing", icon: FiDollarSign, onActivate: () => setShowBilling(true) },
+    { id: "counselling", label: "Counselling", icon: FiHeart, onActivate: () => setShowCounselling(true) },
+    { id: "theatre", label: "Theatre", icon: FiActivity },
+    ...(analysis.inventoryFlags.length > 0 ? [{ id: "inventory", label: "Inventory", icon: FiPackage }] : []),
+  ];
+
   return (
     <>
       <NavBar />
-      <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-8">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8">
         <BackButton label="Back to patient search" fallbackHref="/attend" />
 
+        <div className="lg:grid lg:grid-cols-[200px_1fr] lg:gap-8 lg:items-start">
+          <SectionNav sections={sections} />
+          <div className="min-w-0">
+
         {/* Patient header */}
-        <GlowCard className="mb-6">
+        <GlowCard id="overview" className="mb-6 scroll-mt-28">
           <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-hospital-blue/30 to-ai-violet/30 flex items-center justify-center shrink-0">
@@ -189,7 +219,7 @@ export default function PatientWorkspacePage() {
         </GlowCard>
 
         {/* Medications */}
-        <div className="grid sm:grid-cols-2 gap-5 mb-6">
+        <div id="medications" className="grid sm:grid-cols-2 gap-5 mb-6 scroll-mt-28">
           <GlowCard>
             <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2"><FiActivity className="text-ai-cyan" /> Current Medications</h3>
             <ul className="space-y-1.5 text-[13px] text-slate-300">
@@ -201,24 +231,53 @@ export default function PatientWorkspacePage() {
             <div className="space-y-2">
               {prescriptions.map((rx, i) => {
                 const done = dispensed[i];
+                const stockInfo = inventoryByDrug[rx.drug.toLowerCase()];
+                const reorderTriggered = stockInfo?.unitLmis && REORDER_TRIGGER_STATUSES.includes(stockInfo.unitLmis.status);
                 return (
-                  <div key={i} className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${done ? "bg-mint/5 border-mint/25" : rx.recommended ? "bg-ai-cyan/5 border-ai-cyan/20" : "bg-warn/5 border-warn/20"}`}>
-                    <div className="text-[13px]">
-                      <div className="text-white font-medium flex items-center gap-2 flex-wrap">
-                        {rx.drug} {rx.dose}
-                        {rx.consumable && <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400 bg-white/10 border border-white/15 rounded-full px-1.5 py-0.5">Consumable</span>}
-                        {rx.recommended && <span className="text-[9px] font-bold uppercase tracking-wide text-ai-cyan bg-ai-cyan/10 border border-ai-cyan/25 rounded-full px-1.5 py-0.5">AI Recommended</span>}
+                  <div key={i} className={`p-3 rounded-xl border ${done ? "bg-mint/5 border-mint/25" : rx.recommended ? "bg-ai-cyan/5 border-ai-cyan/20" : "bg-warn/5 border-warn/20"}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[13px] min-w-0">
+                        <div className="text-white font-medium flex items-center gap-2 flex-wrap">
+                          {rx.drug} {rx.dose}
+                          {rx.consumable && <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400 bg-white/10 border border-white/15 rounded-full px-1.5 py-0.5">Consumable</span>}
+                          {rx.recommended && <span className="text-[9px] font-bold uppercase tracking-wide text-ai-cyan bg-ai-cyan/10 border border-ai-cyan/25 rounded-full px-1.5 py-0.5">AI Recommended</span>}
+                        </div>
+                        <div className="text-slate-400 text-[11.5px]">{rx.route && rx.route !== "N/A" ? `${rx.route}, ` : ""}{rx.frequency}</div>
                       </div>
-                      <div className="text-slate-400 text-[11.5px]">{rx.route && rx.route !== "N/A" ? `${rx.route}, ` : ""}{rx.frequency}</div>
+                      <button
+                        onClick={() => setDispensed((d) => ({ ...d, [i]: !d[i] }))}
+                        className={`shrink-0 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                          done ? "border-mint/40 text-mint bg-mint/10" : "border-white/15 text-slate-300 hover:bg-white/5"
+                        }`}
+                      >
+                        {done ? "Issued ✓" : rx.consumable ? "Mark Issued" : "Mark Dispensed"}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setDispensed((d) => ({ ...d, [i]: !d[i] }))}
-                      className={`shrink-0 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
-                        done ? "border-mint/40 text-mint bg-mint/10" : "border-white/15 text-slate-300 hover:bg-white/5"
-                      }`}
-                    >
-                      {done ? "Issued ✓" : rx.consumable ? "Mark Issued" : "Mark Dispensed"}
-                    </button>
+
+                    {/* Compact stock strip — unit stock, central stock, and
+                        whether this item would trigger an automatic reorder,
+                        right where the pharmacist is deciding whether to
+                        dispense. Full LMIS detail still lives in the
+                        Inventory section below for anything needing it. */}
+                    {stockInfo && (stockInfo.unit || stockInfo.central) && (
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5 border-t border-white/10">
+                        {stockInfo.unit && stockInfo.unitLmis && (
+                          <span className={`inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-1 rounded-full border ${LMIS_STATUS_STYLE[stockInfo.unitLmis.status]}`}>
+                            <FiHome size={10} /> Unit: {stockInfo.unit.stock}
+                          </span>
+                        )}
+                        {stockInfo.central && stockInfo.centralLmis && (
+                          <span className={`inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-1 rounded-full border ${LMIS_STATUS_STYLE[stockInfo.centralLmis.status]}`}>
+                            <FiPackage size={10} /> Central: {stockInfo.central.qty}
+                          </span>
+                        )}
+                        <span className={`inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-1 rounded-full border ${
+                          reorderTriggered ? "text-warn bg-warn/10 border-warn/30" : "text-mint bg-mint/10 border-mint/30"
+                        }`}>
+                          <FiZap size={10} /> {reorderTriggered ? "Auto-Reorder Triggered" : "Reorder Not Needed"}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -256,7 +315,7 @@ export default function PatientWorkspacePage() {
         {/* Curated clinical AI analysis, where the case has one */}
         {patient.aiReport && (
           <FadeIn>
-            <GlowCard className="mb-6">
+            <GlowCard id="clinical-analysis" className="mb-6 scroll-mt-28">
               <div className="text-eyebrow mb-3">Clinical AI Analysis</div>
               <div className="flex flex-wrap items-center gap-8 justify-around mb-5">
                 <ProgressRing percent={patient.aiReport.riskScore} color="#EF4444" label="Risk Score" />
@@ -309,6 +368,7 @@ export default function PatientWorkspacePage() {
         )}
 
         {/* Automated cross-checks — always run */}
+        <div id="checks" className="scroll-mt-28">
         <FadeIn>
           <div className="grid sm:grid-cols-2 gap-5 mb-5">
             <GlowCard>
@@ -371,8 +431,10 @@ export default function PatientWorkspacePage() {
             </GlowCard>
           </div>
         </FadeIn>
+        </div>
 
         {(analysis.renal || analysis.relevantReports.length > 0 || analysis.relevantSignal) && (
+          <div id="renal-pv" className="scroll-mt-28">
           <FadeIn>
             <div className="grid sm:grid-cols-2 gap-5 mb-6">
               {analysis.renal && (
@@ -423,6 +485,7 @@ export default function PatientWorkspacePage() {
               )}
             </div>
           </FadeIn>
+          </div>
         )}
 
         {/* Action buttons */}
@@ -444,7 +507,7 @@ export default function PatientWorkspacePage() {
 
         {showBilling && (
           <FadeIn>
-            <GlowCard className="mb-4 border-ai-cyan/20">
+            <GlowCard id="billing" className="mb-4 border-ai-cyan/20 scroll-mt-28">
               <div className="flex items-center gap-2 mb-3">
                 <FiZap className="text-ai-cyan" size={15} />
                 <h3 className="text-white font-bold text-sm">AI Payment Risk</h3>
@@ -540,7 +603,7 @@ export default function PatientWorkspacePage() {
 
         {showCounselling && (
           <FadeIn>
-            <GlowCard className="mb-6">
+            <GlowCard id="counselling" className="mb-6 scroll-mt-28">
               <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2"><FiHeart className="text-mint" /> Quick Counselling Tips</h3>
               {analysis.counsellingTips.length === 0 ? (
                 <p className="text-[12.5px] text-slate-500">No local counselling reference for this patient&apos;s medications — open the full Counselling module for a Live AI card.</p>
@@ -564,7 +627,7 @@ export default function PatientWorkspacePage() {
 
         {/* Theatre linkage */}
         <FadeIn>
-          <GlowCard className="mb-6 border-ai-violet/20">
+          <GlowCard id="theatre" className="mb-6 border-ai-violet/20 scroll-mt-28">
             <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2"><FiActivity className="text-ai-violet" /> Theatre</h3>
             {analysis.theatreRequest ? (
               <div className="flex items-center justify-between flex-wrap gap-3">
@@ -590,7 +653,7 @@ export default function PatientWorkspacePage() {
         {/* Inventory nudge */}
         {analysis.inventoryFlags.length > 0 && (
           <FadeIn>
-            <GlowCard>
+            <GlowCard id="inventory" className="scroll-mt-28">
               <h3 className="text-white font-bold text-sm mb-1 flex items-center gap-2"><FiPackage className="text-warn" /> Unit vs Central Stock — This Patient&apos;s Medications</h3>
               <p className="text-[11px] text-slate-500 mb-4">AMC, ROL, and months-of-stock (MOS) at both the unit and central store, with a recommendation for each.</p>
               <div className="space-y-3">
@@ -640,6 +703,9 @@ export default function PatientWorkspacePage() {
             </GlowCard>
           </FadeIn>
         )}
+
+          </div>
+        </div>
       </main>
     </>
   );

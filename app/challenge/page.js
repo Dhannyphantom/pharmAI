@@ -1,13 +1,15 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiCheckCircle, FiXCircle, FiPhoneCall, FiCpu, FiUser, FiRefreshCw, FiZap } from "react-icons/fi";
 import NavBar from "@/components/NavBar";
 import { PageHeader, GlowCard, PrimaryButton, GhostButton, FadeIn, LiveThinking, AIErrorNote, LiveModeNote } from "@/components/ui";
 import ConfettiBurst from "@/components/ConfettiBurst";
-import { CHALLENGE_CASES } from "@/lib/challengeData";
+import { pickRandomChallengeQuestions, shuffleArray } from "@/lib/challengeData";
 import { useApp } from "@/context/AppContext";
 import { askAIJson } from "@/lib/aiClient";
+
+const SESSION_LENGTH = 5;
 
 const OPTIONS = [
   { value: "YES", label: "Yes, Dispense", icon: FiCheckCircle, color: "border-mint/40 text-mint hover:bg-mint/10" },
@@ -24,9 +26,10 @@ Given a prescription scenario written by the presenter, respond with STRICT JSON
   "aiDetected": "<what an AI safety check would flag, or note that nothing was detected>",
   "pharmacistReasoning": "<how a pharmacist reasons through this — 2-3 sentences>"
 }
-Base this on sound, real pharmacology and standard practice.`;
+Base this on sound, real pharmacology and standard practice. Make the scenario genuinely tricky — the kind of case a rushed clinician could plausibly get wrong — rather than an obvious textbook contraindication.`;
 
 export default function ChallengePage() {
+  const [sessionQuestions, setSessionQuestions] = useState(() => pickRandomChallengeQuestions(SESSION_LENGTH));
   const [index, setIndex] = useState(0);
   const [answer, setAnswer] = useState(null);
   const [revealed, setRevealed] = useState(false);
@@ -37,8 +40,12 @@ export default function ChallengePage() {
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState(null);
 
-  const current = liveMode && liveQuestion ? liveQuestion : CHALLENGE_CASES[index];
+  const current = liveMode && liveQuestion ? liveQuestion : sessionQuestions[index];
   const isCorrect = answer === current.correctAnswer;
+
+  // Randomise the on-screen order of the answer buttons per question, so the
+  // correct answer's position isn't a learnable pattern either.
+  const shuffledOptions = useMemo(() => shuffleArray(OPTIONS), [current]);
 
   async function generateLiveQuestion() {
     if (!customPrompt.trim()) return;
@@ -71,7 +78,7 @@ export default function ChallengePage() {
       setRevealed(false);
       return;
     }
-    if (index + 1 < CHALLENGE_CASES.length) {
+    if (index + 1 < sessionQuestions.length) {
       setIndex(index + 1);
       setAnswer(null);
       setRevealed(false);
@@ -79,6 +86,7 @@ export default function ChallengePage() {
   }
 
   function restart() {
+    setSessionQuestions(pickRandomChallengeQuestions(SESSION_LENGTH));
     setIndex(0);
     setAnswer(null);
     setRevealed(false);
@@ -87,7 +95,7 @@ export default function ChallengePage() {
     resetScore();
   }
 
-  const finished = !liveMode && revealed && index === CHALLENGE_CASES.length - 1;
+  const finished = !liveMode && revealed && index === sessionQuestions.length - 1;
 
   return (
     <>
@@ -99,7 +107,7 @@ export default function ChallengePage() {
           subtitle={
             liveMode
               ? "Live AI Mode is on — type any prescription scenario and Claude generates a fresh challenge question in real time."
-              : "Would you dispense this prescription? Choose an answer, then see what the AI detected and how a pharmacist reasons through it."
+              : `Would you dispense this prescription? ${SESSION_LENGTH} random tricky scenarios each round, drawn from a larger pool — choose an answer, then see what the AI detected and how a pharmacist reasons through it.`
           }
         />
 
@@ -125,7 +133,7 @@ export default function ChallengePage() {
         {(!liveMode || liveQuestion) && (
           <>
             <div className="flex items-center justify-between mb-6">
-              <div className="text-sm text-slate-400">{liveMode ? "Live Custom Question" : `Question ${index + 1} of ${CHALLENGE_CASES.length}`}</div>
+              <div className="text-sm text-slate-400">{liveMode ? "Live Custom Question" : `Question ${index + 1} of ${sessionQuestions.length}`}</div>
               <div className="glass rounded-full px-4 py-1.5 text-sm font-semibold text-white">
                 Score: <span className="text-ai-cyan">{score.correct}</span> / {score.total}
               </div>
@@ -147,7 +155,7 @@ export default function ChallengePage() {
 
                 {!revealed && (
                   <div className="grid sm:grid-cols-3 gap-3">
-                    {OPTIONS.map((opt) => (
+                    {shuffledOptions.map((opt) => (
                       <button
                         key={opt.value}
                         onClick={() => choose(opt.value)}

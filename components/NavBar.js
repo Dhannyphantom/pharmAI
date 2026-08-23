@@ -91,14 +91,16 @@ export default function NavBar() {
     <div className="sticky top-0 z-40">
       <div className="flex items-center justify-between px-4 sm:px-6 py-3 glass-strong border-b border-white/10 flex-wrap gap-y-2">
         <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
-          <span className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-ai-cyan to-ai-violet flex items-center justify-center text-[13px] font-bold text-slate-950 shadow-[0_0_0_1px_rgba(255,255,255,0.15)_inset] transition-transform group-hover:scale-105">
+          <span className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-ai-cyan to-ai-violet flex items-center justify-center text-[13px] font-bold text-slate-950 shadow-[0_0_0_1px_rgba(255,255,255,0.15)_inset] transition-transform group-hover:scale-105 shrink-0">
             P
           </span>
-          <span className="hidden sm:flex items-baseline gap-1.5">
-            <span className="font-bold text-sm tracking-wide text-white">
+          {/* Stacked below the "P" mark, not beside it — kept tight so the
+              row height stays governed by the 32px mark, not the text block. */}
+          <span className="hidden sm:flex flex-col justify-center leading-none">
+            <span className="font-bold text-sm tracking-wide text-white leading-none">
               PhantomAI
             </span>
-            <span className="font-medium text-xs tracking-wide text-slate-400">
+            <span className="font-medium text-[10px] tracking-wide text-slate-400 leading-none mt-1">
               Clinical Pharmacy Assistant
             </span>
           </span>

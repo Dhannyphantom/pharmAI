@@ -1,14 +1,16 @@
 "use client";
 import { useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
-  FiPackage, FiTrendingUp, FiZap, FiClock, FiClipboard, FiActivity, FiTruck, FiSearch, FiAlertTriangle, FiBarChart2, FiCheckCircle, FiHome,
+  FiPackage, FiTrendingUp, FiZap, FiClock, FiClipboard, FiActivity, FiTruck, FiSearch,
+  FiAlertTriangle, FiBarChart2, FiCheckCircle, FiHome, FiChevronDown, FiX,
 } from "react-icons/fi";
 import NavBar from "@/components/NavBar";
 import { PageHeader, GlowCard, FadeIn, PrimaryButton, LevelBar, SegmentedTabs, BackButton, LiveThinking, AIErrorNote, LiveModeNote } from "@/components/ui";
 import {
   EXPIRY_ITEMS, expiryRisk, REQUISITIONS, requisitionFlag,
-  STOCK_VARIANCE, varianceOf, RECEIVING_RECORDS, CENTRAL_STOCK,
+  STOCK_VARIANCE, varianceOf, RECEIVING_RECORDS, CENTRAL_STOCK, getCentralStoreAsUnitItems,
 } from "@/lib/bulkStoreData";
 import { computeLmis, LMIS_STATUS_STYLE } from "@/lib/lmis";
 import { computeForecast } from "@/lib/forecast";
@@ -38,14 +40,25 @@ const TABS = [
   { value: "search", label: "Smart Search", icon: FiSearch },
 ];
 
+// "Unit" + "Central Store" are both valid locations for the forecast view —
+// Central Store isn't in UNITS since it isn't a dispensing unit, so it's
+// added here as its own top entry in the location dropdown.
+const LOCATIONS = ["Central Store", ...UNITS];
+
+function getItemsForLocation(loc) {
+  return loc === "Central Store" ? getCentralStoreAsUnitItems() : getUnitInventory(loc);
+}
+
 const INVENTORY_SYSTEM_PROMPT = `You are a hospital pharmacy inventory analyst AI in an education demo. Given simulated stock data for one medication, write a concise (under 90 words) plain-language interpretation: is the stock situation concerning, and what would you recommend? No markdown, no JSON, just a short paragraph.`;
 const SEARCH_SYSTEM_PROMPT = `You are a natural-language inventory search assistant for a hospital pharmacy education demo. Given unit-level and central-store inventory (JSON) and a natural-language question, answer directly and concisely (under 80 words) using only the data provided. Plain text, no markdown, no JSON.`;
 
 export default function InventoryPage() {
   const [unit, setUnit] = useState(UNITS[0]);
+  const [unitMenuOpen, setUnitMenuOpen] = useState(false);
   const [tab, setTab] = useState("unit");
-  const unitItems = useMemo(() => getUnitInventory(unit), [unit]);
-  const [selected, setSelected] = useState(unitItems[0].name);
+  const [aiReorderEnabled, setAiReorderEnabled] = useState(false);
+  const unitItems = useMemo(() => getItemsForLocation(unit), [unit]);
+  const [selected, setSelected] = useState(unitItems[0]?.name);
   const [liveText, setLiveText] = useState(null);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState(null);
@@ -53,15 +66,34 @@ export default function InventoryPage() {
   const [liveAnswer, setLiveAnswer] = useState(null);
   const { liveMode } = useApp();
 
+  // Always-available quick search across every unit's formulary plus
+  // Central Store, so a specific drug can be found without first guessing
+  // which unit or tab it lives in.
+  const [globalQuery, setGlobalQuery] = useState("");
+  const allLocationOptions = useMemo(() => {
+    const list = [];
+    LOCATIONS.forEach((loc) => {
+      getItemsForLocation(loc).forEach((item) => list.push({ name: item.name, location: loc }));
+    });
+    return list;
+  }, []);
+  const globalMatches = useMemo(() => {
+    const q = globalQuery.trim().toLowerCase();
+    if (!q) return [];
+    return allLocationOptions.filter((o) => o.name.toLowerCase().includes(q)).slice(0, 8);
+  }, [globalQuery, allLocationOptions]);
+
   const item = unitItems.find((i) => i.name === selected) || unitItems[0];
-  const itemRisk = computeRisk(item);
-  const stockPct = Math.max(0, Math.min(100, Math.round((item.stock / (item.reorderPoint * 2)) * 100)));
-  const forecast = useMemo(() => computeForecast(item), [item]);
-  const predictionChartData = [
-    ...forecast.history.map((v, i) => ({ month: `M-${forecast.history.length - i}`, actual: v, predicted: null })),
-    { month: "Today", actual: forecast.history[forecast.history.length - 1], predicted: forecast.history[forecast.history.length - 1] },
-    ...forecast.predicted.map((v, i) => ({ month: `M+${i + 1}`, actual: null, predicted: v })),
-  ];
+  const itemRisk = item ? computeRisk(item) : "Low";
+  const stockPct = item ? Math.max(0, Math.min(100, Math.round((item.stock / (item.reorderPoint * 2)) * 100))) : 0;
+  const forecast = useMemo(() => (item ? computeForecast(item, { autoReorder: aiReorderEnabled }) : null), [item, aiReorderEnabled]);
+  const predictionChartData = forecast
+    ? [
+        ...forecast.history.map((v, i) => ({ month: forecast.historyMonthLabels[i], actual: v, predicted: null })),
+        { month: forecast.currentMonthLabel, actual: forecast.history[forecast.history.length - 1] ?? null, predicted: forecast.history[forecast.history.length - 1] ?? null },
+        ...forecast.predicted.map((v, i) => ({ month: forecast.predictedMonthLabels[i], actual: null, predicted: v })),
+      ]
+    : [];
 
   const sortedExpiry = useMemo(() => [...EXPIRY_ITEMS].sort((a, b) => a.daysToExpiry - b.daysToExpiry), []);
   const sortedVariance = useMemo(() => [...STOCK_VARIANCE].sort((a, b) => Math.abs(varianceOf(b)) - Math.abs(varianceOf(a))), []);
@@ -73,16 +105,25 @@ export default function InventoryPage() {
 
   function changeUnit(u) {
     setUnit(u);
-    const items = getUnitInventory(u);
-    setSelected(items[0].name);
+    const items = getItemsForLocation(u);
+    setSelected(items[0]?.name);
+    setLiveText(null);
+  }
+
+  function jumpToMatch(match) {
+    setUnit(match.location);
+    setSelected(match.name);
+    setTab("unit");
+    setGlobalQuery("");
     setLiveText(null);
   }
 
   async function interpret() {
+    if (!item || !forecast) return;
     setLiveError(null); setLiveLoading(true); setLiveText(null);
     try {
       const text = await askAI(
-        `Unit: ${unit}\nMedicine: ${item.name}\nCurrent stock: ${item.stock}\nReorder point: ${item.reorderPoint}\nExpiry: ${item.expiry}\nPast 6 months actual consumption: ${forecast.history.join(", ")}\nPredicted next 6 months demand: ${forecast.predicted.join(", ")}\nPredicted stockout month: ${forecast.stockoutMonth ?? "none within 6 months"}\nRisk rating: ${itemRisk}`,
+        `Unit: ${unit}\nMedicine: ${item.name}\nCurrent stock: ${item.stock}\nReorder point: ${item.reorderPoint}\nExpiry: ${item.expiry}\nPast 6 months actual consumption: ${forecast.history.join(", ")}\nPredicted next 6 months demand: ${forecast.predicted.join(", ")}\nPredicted stockout: ${forecast.stockoutMonthLabel ?? "none within 6 months"}\nRisk rating: ${itemRisk}\nAI auto-reordering enabled: ${aiReorderEnabled ? "yes" : "no"}`,
         { system: INVENTORY_SYSTEM_PROMPT, maxTokens: 250 }
       );
       setLiveText(text);
@@ -109,28 +150,118 @@ export default function InventoryPage() {
         <PageHeader
           eyebrow="Inventory Management"
           title="Unit & Central Stock Intelligence"
-          subtitle="Demand forecasting and full LMIS analysis per unit, plus the shared Bulk Store tools: expiry monitoring, requisition anomalies, stock variance and receiving checks, and natural-language search."
+          subtitle="Demand forecasting and full LMIS analysis per unit or Central Store, plus expiry monitoring, requisition anomalies, stock variance and receiving checks."
         />
 
-        {/* Unit selector */}
-        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mr-1 shrink-0"><FiHome size={12} /> Unit:</div>
-          {UNITS.map((u) => (
+        {/* Always-available quick search — finds a drug across every unit + Central Store */}
+        <div className="relative mb-6">
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.04] border border-white/12 focus-within:border-ai-cyan transition-colors">
+            <FiSearch className="text-slate-400 shrink-0" size={16} />
+            <input
+              type="text"
+              value={globalQuery}
+              onChange={(e) => setGlobalQuery(e.target.value)}
+              placeholder="Quick search any drug or item — across every unit and Central Store..."
+              className="flex-1 bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none"
+            />
+            {globalQuery && (
+              <button onClick={() => setGlobalQuery("")} className="text-slate-500 hover:text-slate-300 shrink-0">
+                <FiX size={14} />
+              </button>
+            )}
+          </div>
+          {globalQuery.trim() && (
+            <div className="absolute z-30 mt-2 w-full glass-strong border border-white/12 rounded-xl p-1.5 max-h-72 overflow-y-auto">
+              {globalMatches.length === 0 ? (
+                <div className="px-3 py-4 text-center text-[12.5px] text-slate-500">No items match &ldquo;{globalQuery}&rdquo;.</div>
+              ) : (
+                globalMatches.map((m, i) => (
+                  <button
+                    key={`${m.name}-${m.location}-${i}`}
+                    onClick={() => jumpToMatch(m)}
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left text-sm text-slate-200 hover:bg-white/5 transition-colors"
+                  >
+                    <span className="truncate">{m.name}</span>
+                    <span className={`shrink-0 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+                      m.location === "Central Store" ? "text-ai-violet border-ai-violet/30 bg-ai-violet/10" : "text-ai-cyan border-ai-cyan/30 bg-ai-cyan/10"
+                    }`}>{m.location}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Location dropdown (units + Central Store) and AI reordering toggle */}
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <div className="relative">
             <button
-              key={u}
-              onClick={() => changeUnit(u)}
-              className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                unit === u ? "bg-gradient-to-r from-hospital-blue to-ai-violet text-white border-transparent glow-blue" : "border-white/12 text-slate-300 hover:border-white/25 hover:bg-white/5"
-              }`}
+              onClick={() => setUnitMenuOpen((v) => !v)}
+              className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl glass border border-white/12 text-sm font-semibold text-white hover:border-ai-cyan/40 transition-colors"
             >
-              {u}
+              {unit === "Central Store" ? <FiPackage className="text-ai-violet shrink-0" size={15} /> : <FiHome className="text-ai-cyan shrink-0" size={15} />}
+              {unit}
+              <FiChevronDown size={14} className={`text-slate-400 transition-transform ${unitMenuOpen ? "rotate-180" : ""}`} />
             </button>
-          ))}
+
+            <AnimatePresence>
+              {unitMenuOpen && (
+                <>
+                  <button
+                    className="fixed inset-0 z-20 cursor-default"
+                    onClick={() => setUnitMenuOpen(false)}
+                    aria-hidden="true"
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute z-30 mt-2 w-64 glass-strong border border-white/12 rounded-xl p-1.5 shadow-xl"
+                  >
+                    <button
+                      onClick={() => { changeUnit("Central Store"); setUnitMenuOpen(false); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-left transition-colors ${
+                        unit === "Central Store" ? "bg-ai-violet/15 text-ai-violet" : "text-slate-300 hover:bg-white/5"
+                      }`}
+                    >
+                      <FiPackage size={14} className="shrink-0" /> Central Store
+                    </button>
+                    <div className="h-px bg-white/10 my-1.5" />
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 px-3 pt-1 pb-1.5">Hospital Units</div>
+                    <div className="max-h-56 overflow-y-auto">
+                      {UNITS.map((u) => (
+                        <button
+                          key={u}
+                          onClick={() => { changeUnit(u); setUnitMenuOpen(false); }}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-left transition-colors ${
+                            unit === u ? "bg-ai-cyan/15 text-ai-cyan" : "text-slate-300 hover:bg-white/5"
+                          }`}
+                        >
+                          <FiHome size={14} className="shrink-0" /> {u}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <button
+            onClick={() => setAiReorderEnabled((v) => !v)}
+            title="Simulate automatic replenishment once stock hits the reorder point"
+            className={`flex items-center gap-2 text-xs font-semibold px-3.5 py-2.5 rounded-xl border transition-colors ${
+              aiReorderEnabled ? "border-ai-cyan/50 bg-ai-cyan/10 text-ai-cyan glow-cyan" : "border-white/12 text-slate-400 hover:text-slate-200 hover:border-white/20"
+            }`}
+          >
+            <FiZap size={13} /> {aiReorderEnabled ? "AI Reordering: On" : "Enable AI Reordering"}
+          </button>
         </div>
 
         <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
 
-        {tab === "unit" && (
+        {tab === "unit" && item && forecast && (
           <>
             <FadeIn>
               <GlowCard className="mb-6 overflow-x-auto">
@@ -201,7 +332,7 @@ export default function InventoryPage() {
                 <GlowCard>
                   <div className="flex items-center gap-2 mb-1">
                     <FiTrendingUp className="text-ai-cyan" />
-                    <h3 className="text-white font-bold text-sm">{item.name} — Predicted Demand, Next 6 Months</h3>
+                    <h3 className="text-white font-bold text-sm">{item.name} — Predicted Demand</h3>
                   </div>
                   <p className="text-[12px] text-slate-500 mb-4">
                     {unit} · Reorder point: {item.reorderPoint} units · trend: {forecast.trend >= 0 ? "+" : ""}{(forecast.trend * 100).toFixed(1)}%/mo
@@ -222,20 +353,42 @@ export default function InventoryPage() {
                     </ResponsiveContainer>
                   </div>
 
-                  {forecast.stockoutMonth ? (
+                  {/* Stockout / reordering status — only surfaces an alarming
+                      banner when it's actually warranted: either AI reordering
+                      is on and even it can't keep pace, or reordering is off
+                      and the item is already at Medium/High risk. A healthy,
+                      well-stocked item just gets a calm confirmation instead
+                      of a scary but practically meaningless 6-month projection. */}
+                  {aiReorderEnabled ? (
+                    forecast.stockoutMonth ? (
+                      <div className="mt-3 p-3 rounded-lg bg-danger/10 border border-danger/25 text-[12.5px] text-danger flex items-center gap-2">
+                        <FiAlertTriangle size={14} className="shrink-0" /> Even with AI reordering active, the current lead time can&apos;t keep pace with demand — a stockout is still projected for {forecast.stockoutMonthLabel}. Consider expediting this order or raising the safety stock level.
+                      </div>
+                    ) : forecast.reorderPlacedMonthLabel ? (
+                      <div className="mt-3 p-3 rounded-lg bg-mint/10 border border-mint/25 text-[12.5px] text-mint flex items-center gap-2">
+                        <FiCheckCircle size={14} className="shrink-0" /> AI Reordering active — a replenishment order is projected for {forecast.reorderPlacedMonthLabel}, arriving {forecast.reorderArrivesMonthLabel}, keeping stock above zero throughout.
+                      </div>
+                    ) : (
+                      <div className="mt-3 p-3 rounded-lg bg-mint/10 border border-mint/25 text-[12.5px] text-mint flex items-center gap-2">
+                        <FiCheckCircle size={14} className="shrink-0" /> AI Reordering active — stock is projected to stay above the reorder point for the next 6 months, so no order is needed yet.
+                      </div>
+                    )
+                  ) : itemRisk !== "Low" && forecast.stockoutMonth ? (
                     <div className="mt-3 p-3 rounded-lg bg-danger/10 border border-danger/25 text-[12.5px] text-danger flex items-center gap-2">
-                      <FiAlertTriangle size={14} className="shrink-0" /> Stockout predicted in Month {forecast.stockoutMonth} if current consumption trend and stock levels continue — reorder now.
+                      <FiAlertTriangle size={14} className="shrink-0" /> This item is already below a healthy stock level — at the current consumption trend, with no reorder placed, it's projected to run out in {forecast.stockoutMonthLabel}.
                     </div>
                   ) : (
                     <div className="mt-3 p-3 rounded-lg bg-mint/10 border border-mint/25 text-[12.5px] text-mint flex items-center gap-2">
-                      <FiCheckCircle size={14} className="shrink-0" /> No stockout predicted within the next 6 months at the current trend.
+                      <FiCheckCircle size={14} className="shrink-0" /> Stock is currently healthy — no urgent reorder action needed.
                     </div>
                   )}
-                  {itemRisk !== "Low" && (
+
+                  {!aiReorderEnabled && itemRisk !== "Low" && (
                     <div className="mt-3 p-3 rounded-lg bg-warn/10 border border-warn/25 text-[12.5px] text-warn flex items-center gap-2">
                       <FiPackage size={14} /> AI Suggestion: reorder {Math.max(item.reorderPoint * 2 - item.stock, 100)} units within the next cycle.
                     </div>
                   )}
+
                   {liveMode && (
                     <div className="mt-4 pt-4 border-t border-white/10">
                       <PrimaryButton onClick={interpret} disabled={liveLoading} className="flex items-center gap-2 mb-3">
@@ -393,7 +546,7 @@ export default function InventoryPage() {
                 )}
               </div>
               <p className="text-[11.5px] text-slate-500">
-                {liveMode ? "Ask Claude a natural-language question across this unit's and central store inventory." : "Instant keyword filter over this unit's formulary. Switch on Live AI Mode to ask natural-language questions."}
+                {liveMode ? "Ask Claude a natural-language question across this unit's and central store inventory." : "Instant keyword filter over this location's formulary. Switch on Live AI Mode to ask natural-language questions."}
               </p>
             </GlowCard>
 
