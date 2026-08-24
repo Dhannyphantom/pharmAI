@@ -3,7 +3,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   FiActivity, FiArrowRight, FiUser, FiHeart, FiAward, FiCamera, FiShare2,
-  FiSliders, FiPackage, FiAlertTriangle, FiAlertOctagon, FiMessageCircle,
+  FiSliders, FiPackage, FiAlertTriangle, FiAlertOctagon, FiMessageCircle, FiClipboard,
 } from "react-icons/fi";
 import NavBar from "@/components/NavBar";
 import { GlowCard } from "@/components/ui";
@@ -19,6 +19,9 @@ const MODULE_LINKS = [
   { href: "/theatre", label: "Theatre", desc: "Request board with complication planning, requests, payment tracker", icon: FiActivity },
   { href: "/inventory", label: "Inventory Management", desc: "Predictive forecasting, LMIS analysis, expiry, requisitions, variance", icon: FiPackage },
   { href: "/pharmacovigilance", label: "Pharmacovigilance", desc: "Signal detection from adverse reports", icon: FiAlertTriangle },
+  { href: "/patient", label: "Patient Portal", desc: "Adherence tracking, smart reminders, and instructions in local languages", icon: FiHeart },
+  { href: "/communication", label: "Patient Communication", desc: "Bridge language barriers during counselling", icon: FiMessageCircle },
+  { href: "/documentation", label: "Documentation & Records", desc: "AI-assisted intervention, dispensing, and incident documentation", icon: FiClipboard },
   { href: "/drug-discovery", label: "Drug Discovery", desc: "Millions of molecules to one medicine", icon: FiActivity },
   { href: "/hallucination", label: "AI Hallucination Demo", desc: "When the AI is confidently wrong", icon: FiAlertOctagon },
 ];
@@ -56,34 +59,51 @@ export default function Home() {
           </p>
         </motion.div>
 
-        {/* Primary flow — Attend to Patient */}
+        {/* Primary flows — Attend to Patient (pharmacist) and Patient Portal (patient) */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.25 }}
-          className="w-full max-w-2xl mb-14"
+          className="w-full max-w-2xl mb-6 grid sm:grid-cols-2 gap-4"
         >
           <Link href="/attend">
-            <GlowCard interactive glow="glow-violet" className="border-ai-violet/30 text-left py-7">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="relative w-12 h-12 rounded-2xl bg-ai-violet/15 border border-ai-violet/30 flex items-center justify-center text-ai-violet shrink-0">
-                    <FiUser size={22} />
-                    <motion.div
-                      className="absolute inset-0 rounded-2xl border border-ai-violet/50"
-                      animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
-                      transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-lg font-bold text-white">Attend to Patient</span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-ai-violet bg-ai-violet/15 border border-ai-violet/30 rounded-full px-1.5 py-0.5">Start Here</span>
-                    </div>
-                    <p className="text-sm text-slate-400">Search a patient, then interactions, duplicates, renal dosing, ADR signals, billing, theatre and inventory all come to you.</p>
-                  </div>
+            <GlowCard interactive glow="glow-violet" className="border-ai-violet/30 text-left py-6 h-full">
+              <div className="flex items-center gap-3.5">
+                <div className="relative w-11 h-11 rounded-2xl bg-ai-violet/15 border border-ai-violet/30 flex items-center justify-center text-ai-violet shrink-0">
+                  <FiUser size={20} />
+                  <motion.div
+                    className="absolute inset-0 rounded-2xl border border-ai-violet/50"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
+                    transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                  />
                 </div>
-                <FiArrowRight className="text-ai-violet shrink-0 hidden sm:block" size={20} />
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-base font-bold text-white">Attend to Patient</span>
+                  </div>
+                  <p className="text-xs text-slate-400">For pharmacists — search a patient, get the full clinical workspace.</p>
+                </div>
+              </div>
+            </GlowCard>
+          </Link>
+
+          <Link href="/patient">
+            <GlowCard interactive glow="glow-mint" className="border-mint/30 text-left py-6 h-full">
+              <div className="flex items-center gap-3.5">
+                <div className="relative w-11 h-11 rounded-2xl bg-mint/15 border border-mint/30 flex items-center justify-center text-mint shrink-0">
+                  <FiHeart size={20} />
+                  <motion.div
+                    className="absolute inset-0 rounded-2xl border border-mint/50"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
+                    transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-base font-bold text-white">Patient Portal</span>
+                  </div>
+                  <p className="text-xs text-slate-400">For patients — adherence, reminders, and instructions in your language.</p>
+                </div>
               </div>
             </GlowCard>
           </Link>

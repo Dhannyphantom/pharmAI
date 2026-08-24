@@ -10,11 +10,12 @@ import {
 } from "react-icons/fi";
 import NavBar from "@/components/NavBar";
 import { PageHeader, GlowCard, FadeIn, StaggerList, SeverityPill, ProgressRing, GhostButton, PrimaryButton, BackButton, LiveModeNote, AIErrorNote } from "@/components/ui";
-import { getPatientByPid, getPatientAnalysis } from "@/lib/patients";
+import { getPatientByPid, getPatientAnalysis, allMedications } from "@/lib/patients";
 import { getProcedureById } from "@/lib/surgicalData";
 import { LMIS_STATUS_STYLE } from "@/lib/lmis";
 import { getRecommendedAdditions } from "@/lib/prescriptionRecommendations";
 import { computePaymentRisk, PAYMENT_RISK_STYLE } from "@/lib/paymentRisk";
+import { interpretABG, getAcidBaseInterventions } from "@/lib/acidBase";
 import { useApp } from "@/context/AppContext";
 import { askAI } from "@/lib/aiClient";
 import SectionNav from "@/components/SectionNav";
@@ -31,6 +32,13 @@ const RENAL_BAND_STYLE = {
   moderate: "text-warn bg-warn/10 border-warn/30",
   severe: "text-danger bg-danger/10 border-danger/30",
   failure: "text-danger bg-danger/20 border-danger/40",
+};
+
+const ABG_SEVERITY_PILL = {
+  None: "Low",
+  Mild: "Low",
+  Moderate: "Moderate",
+  Severe: "High",
 };
 
 const BILLING_UNITS = ["A&E", "NHIS Pharmacy", "In-Patient", "GOPD Pharmacy", "Paediatric", "Theatre", "Theatre Pharmacy", "O&G", "O&G Pharmacy", "Renal"];
@@ -138,6 +146,9 @@ export default function PatientWorkspacePage() {
   const inventoryByDrug = Object.fromEntries(analysis.inventoryFlags.map((f) => [f.drug.toLowerCase(), f]));
   const REORDER_TRIGGER_STATUSES = ["Below Reorder Level", "Below Safety Stock", "Stockout"];
 
+  const abgInterpretation = patient.abg ? interpretABG(patient.abg) : null;
+  const abgInterventions = abgInterpretation ? getAcidBaseInterventions(abgInterpretation, allMedications(patient)) : [];
+
   // Quick Jump sections — only include entries for content that actually
   // exists on this patient's chart. Billing/Counselling are collapsed by
   // default, so their nav items expand the panel (onActivate) before
@@ -150,6 +161,7 @@ export default function PatientWorkspacePage() {
     ...((analysis.renal || analysis.relevantReports.length > 0 || analysis.relevantSignal)
       ? [{ id: "renal-pv", label: "Renal & ADR", icon: FiTarget }]
       : []),
+    ...(abgInterpretation ? [{ id: "acid-base", label: "Acid-Base", icon: FiActivity }] : []),
     { id: "billing", label: "Billing", icon: FiDollarSign, onActivate: () => setShowBilling(true) },
     { id: "counselling", label: "Counselling", icon: FiHeart, onActivate: () => setShowCounselling(true) },
     { id: "theatre", label: "Theatre", icon: FiActivity },
@@ -484,6 +496,54 @@ export default function PatientWorkspacePage() {
                 </GlowCard>
               )}
             </div>
+          </FadeIn>
+          </div>
+        )}
+
+        {abgInterpretation && (
+          <div id="acid-base" className="scroll-mt-28">
+          <FadeIn>
+            <GlowCard className="mb-6 border-ai-cyan/20">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                <h3 className="text-white font-bold text-sm flex items-center gap-2"><FiActivity className="text-ai-cyan" /> Acid-Base Disturbance Profile</h3>
+                <SeverityPill level={ABG_SEVERITY_PILL[abgInterpretation.severity] || "Low"} />
+              </div>
+
+              <div className="grid sm:grid-cols-4 gap-3 mb-4">
+                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/10 text-center">
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">pH</div>
+                  <div className="text-lg font-bold text-white tabular-nums">{patient.abg.pH}</div>
+                </div>
+                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/10 text-center">
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">pCO₂</div>
+                  <div className="text-lg font-bold text-white tabular-nums">{patient.abg.pco2} <span className="text-[10px] font-normal text-slate-500">mmHg</span></div>
+                </div>
+                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/10 text-center">
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">HCO₃⁻</div>
+                  <div className="text-lg font-bold text-white tabular-nums">{patient.abg.hco3} <span className="text-[10px] font-normal text-slate-500">mEq/L</span></div>
+                </div>
+                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/10 text-center">
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">Lactate</div>
+                  <div className="text-lg font-bold text-white tabular-nums">{patient.abg.lactate} <span className="text-[10px] font-normal text-slate-500">mmol/L</span></div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-ai-cyan/5 border border-ai-cyan/20 mb-4">
+                <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                  <span className="text-sm font-bold text-white">{abgInterpretation.primaryDisorder}</span>
+                  <span className="text-[11px] text-slate-400">{abgInterpretation.compensation}</span>
+                </div>
+                <p className="text-[12.5px] text-slate-300 leading-relaxed">{abgInterpretation.explanation}</p>
+                {patient.abg.note && <p className="text-[11.5px] text-ai-cyan mt-2">→ {patient.abg.note}</p>}
+              </div>
+
+              <h4 className="text-white font-bold text-sm mb-2 flex items-center gap-2"><FiTarget className="text-warn" size={15} /> How This Affects the Treatment Plan — Suggested Interventions</h4>
+              <StaggerList
+                items={abgInterventions}
+                gap="gap-1.5"
+                renderItem={(txt) => <div className="text-[12.5px] text-slate-300 p-2.5 rounded-lg bg-warn/5 border border-warn/15">{txt}</div>}
+              />
+            </GlowCard>
           </FadeIn>
           </div>
         )}

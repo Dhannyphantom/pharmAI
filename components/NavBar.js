@@ -21,6 +21,7 @@ import {
   FiActivity,
   FiAlertOctagon,
   FiMessageCircle,
+  FiClipboard,
 } from "react-icons/fi";
 import { useApp } from "@/context/AppContext";
 
@@ -70,6 +71,14 @@ const MODULE_GROUPS = [
     ],
   },
   {
+    label: "Patient & Records",
+    items: [
+      { href: "/patient", label: "Patient Portal", icon: FiHeart },
+      { href: "/communication", label: "Patient Communication", icon: FiMessageCircle },
+      { href: "/documentation", label: "Documentation & Records", icon: FiClipboard },
+    ],
+  },
+  {
     label: "Overview",
     items: [
       { href: "/drug-discovery", label: "Drug Discovery", icon: FiActivity },
@@ -116,6 +125,17 @@ export default function NavBar() {
             }`}
           >
             <FiUser size={12} /> Attend to Patient
+          </Link>
+
+          <Link
+            href="/patient"
+            className={`hidden md:flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-colors ${
+              pathname.startsWith("/patient")
+                ? "border-mint/50 text-mint bg-mint/15"
+                : "border-mint/30 text-mint/90 hover:bg-mint/10"
+            }`}
+          >
+            <FiHeart size={12} /> Patient
           </Link>
 
           {/* Live Mode — console-style power toggle */}
@@ -182,7 +202,7 @@ export default function NavBar() {
               <Link
                 href="/attend"
                 onClick={() => setOpen(false)}
-                className={`flex items-center gap-2.5 text-sm px-3 py-3 rounded-lg border mb-4 font-semibold ${
+                className={`flex items-center gap-2.5 text-sm px-3 py-3 rounded-lg border mb-3 font-semibold ${
                   pathname.startsWith("/attend")
                     ? "border-ai-violet/50 bg-ai-violet/10 text-ai-violet"
                     : "border-ai-violet/25 text-ai-violet bg-ai-violet/5"
@@ -190,6 +210,19 @@ export default function NavBar() {
               >
                 <FiUser size={15} className="shrink-0" /> Attend to Patient —
                 the unified workflow
+              </Link>
+
+              <Link
+                href="/patient"
+                onClick={() => setOpen(false)}
+                className={`flex items-center gap-2.5 text-sm px-3 py-3 rounded-lg border mb-4 font-semibold ${
+                  pathname.startsWith("/patient")
+                    ? "border-mint/50 bg-mint/10 text-mint"
+                    : "border-mint/25 text-mint bg-mint/5"
+                }`}
+              >
+                <FiHeart size={15} className="shrink-0" /> Patient Portal —
+                adherence, reminders & instructions
               </Link>
 
               <div className="space-y-5">
