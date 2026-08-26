@@ -222,7 +222,7 @@ export default function NavBar() {
                 }`}
               >
                 <FiHeart size={15} className="shrink-0" /> Patient Portal —
-                adherence, reminders & instructions
+                your medicines, reminders & account
               </Link>
 
               <div className="space-y-5">

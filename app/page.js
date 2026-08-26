@@ -102,7 +102,7 @@ export default function Home() {
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-base font-bold text-white">Patient Portal</span>
                   </div>
-                  <p className="text-xs text-slate-400">For patients — adherence, reminders, and instructions in your language.</p>
+                  <p className="text-xs text-slate-400">Simulates a patient already signed in — adherence, reminders, and instructions in your language.</p>
                 </div>
               </div>
             </GlowCard>
