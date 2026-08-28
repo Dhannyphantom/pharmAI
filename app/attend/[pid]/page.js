@@ -6,7 +6,7 @@ import {
   FiUser, FiAlertTriangle, FiCopy, FiActivity, FiShield,
   FiCheckCircle, FiXCircle, FiPhoneCall, FiEye, FiDollarSign, FiCamera,
   FiHeart, FiPackage, FiTarget, FiPercent, FiClock, FiChevronDown, FiChevronUp,
-  FiArrowRight, FiSend, FiFilter, FiPlus, FiZap, FiHome,
+  FiArrowRight, FiSend, FiFilter, FiPlus, FiZap, FiHome, FiRepeat, FiRotateCcw,
 } from "react-icons/fi";
 import NavBar from "@/components/NavBar";
 import { PageHeader, GlowCard, FadeIn, StaggerList, SeverityPill, ProgressRing, GhostButton, PrimaryButton, BackButton, LiveModeNote, AIErrorNote } from "@/components/ui";
@@ -16,6 +16,7 @@ import { LMIS_STATUS_STYLE } from "@/lib/lmis";
 import { getRecommendedAdditions } from "@/lib/prescriptionRecommendations";
 import { computePaymentRisk, PAYMENT_RISK_STYLE } from "@/lib/paymentRisk";
 import { interpretABG, getAcidBaseInterventions } from "@/lib/acidBase";
+import { getAlternatives } from "@/lib/drugAlternatives";
 import { useApp } from "@/context/AppContext";
 import { askAI } from "@/lib/aiClient";
 import SectionNav from "@/components/SectionNav";
@@ -107,6 +108,35 @@ export default function PatientWorkspacePage() {
     ]);
   }
 
+  // Replace a prescription in-place with a suggested alternative (e.g. when
+  // an interaction check flags it), keeping the original on hand so it can
+  // be undone. Adding, rather than replacing, leaves the original
+  // prescription untouched and appends the alternative as a new item —
+  // useful when the pharmacist wants the prescriber to choose between them.
+  function replacePrescriptionWithAlternative(index, alt) {
+    setPrescriptions((rx) => rx.map((r, i) => {
+      if (i !== index) return r;
+      const original = r.swappedFrom || { drug: r.drug, dose: r.dose, route: r.route, frequency: r.frequency };
+      return {
+        drug: alt.drug,
+        dose: alt.dose,
+        route: alt.route,
+        frequency: alt.frequency,
+        dispensed: false,
+        swappedFrom: original,
+        swapRationale: alt.rationale,
+      };
+    }));
+  }
+
+  function addAlternativePrescription(alt) {
+    setPrescriptions((rx) => [...rx, { ...alt, dispensed: false, isAlternative: true }]);
+  }
+
+  function undoSwap(index) {
+    setPrescriptions((rx) => rx.map((r, i) => (i === index && r.swappedFrom ? { ...r.swappedFrom, dispensed: false } : r)));
+  }
+
   const filteredBilling = useMemo(() => {
     let rows = [...(patient?.billingHistory || [])];
     if (billingStatusFilter !== "All") rows = rows.filter((b) => b.status === billingStatusFilter);
@@ -133,7 +163,11 @@ export default function PatientWorkspacePage() {
     );
   }
 
-  const analysis = getPatientAnalysis(patient);
+  // Recomputed against the live `prescriptions` state (not the static
+  // patient record) so interaction/duplicate/dose checks react immediately
+  // when a prescription is added, replaced, or swapped for an alternative.
+  const patientForAnalysis = { ...patient, newPrescriptions: prescriptions };
+  const analysis = getPatientAnalysis(patientForAnalysis);
   const outstandingBills = patient.billingHistory.filter((b) => b.status !== "Paid");
   const actionMeta = patient.finalRecommendation ? ACTION_META[patient.finalRecommendation.action] : null;
   const ActionIcon = actionMeta?.icon;
@@ -246,15 +280,26 @@ export default function PatientWorkspacePage() {
                 const stockInfo = inventoryByDrug[rx.drug.toLowerCase()];
                 const reorderTriggered = stockInfo?.unitLmis && REORDER_TRIGGER_STATUSES.includes(stockInfo.unitLmis.status);
                 return (
-                  <div key={i} className={`p-3 rounded-xl border ${done ? "bg-mint/5 border-mint/25" : rx.recommended ? "bg-ai-cyan/5 border-ai-cyan/20" : "bg-warn/5 border-warn/20"}`}>
+                  <div key={i} className={`p-3 rounded-xl border ${done ? "bg-mint/5 border-mint/25" : rx.swappedFrom ? "bg-mint/5 border-mint/25" : rx.isAlternative ? "bg-ai-violet/5 border-ai-violet/20" : rx.recommended ? "bg-ai-cyan/5 border-ai-cyan/20" : "bg-warn/5 border-warn/20"}`}>
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-[13px] min-w-0">
                         <div className="text-white font-medium flex items-center gap-2 flex-wrap">
                           {rx.drug} {rx.dose}
                           {rx.consumable && <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400 bg-white/10 border border-white/15 rounded-full px-1.5 py-0.5">Consumable</span>}
                           {rx.recommended && <span className="text-[9px] font-bold uppercase tracking-wide text-ai-cyan bg-ai-cyan/10 border border-ai-cyan/25 rounded-full px-1.5 py-0.5">AI Recommended</span>}
+                          {rx.swappedFrom && <span className="text-[9px] font-bold uppercase tracking-wide text-mint bg-mint/10 border border-mint/25 rounded-full px-1.5 py-0.5 flex items-center gap-1"><FiRepeat size={9} /> Swapped</span>}
+                          {rx.isAlternative && <span className="text-[9px] font-bold uppercase tracking-wide text-ai-violet bg-ai-violet/10 border border-ai-violet/25 rounded-full px-1.5 py-0.5">Alternative</span>}
                         </div>
                         <div className="text-slate-400 text-[11.5px]">{rx.route && rx.route !== "N/A" ? `${rx.route}, ` : ""}{rx.frequency}</div>
+                        {rx.swappedFrom && (
+                          <div className="flex items-center gap-2 mt-1.5 text-[11px] text-mint">
+                            <FiRepeat size={10} className="shrink-0" />
+                            <span>Replaced {rx.swappedFrom.drug} {rx.swappedFrom.dose} due to an interaction</span>
+                            <button onClick={() => undoSwap(i)} className="flex items-center gap-1 text-slate-400 hover:text-white underline underline-offset-2 transition-colors">
+                              <FiRotateCcw size={10} /> Undo
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={() => setDispensed((d) => ({ ...d, [i]: !d[i] }))}
@@ -351,6 +396,12 @@ export default function PatientWorkspacePage() {
                     </div>
                     <p className="text-[12.5px] text-slate-300 mb-1.5">{it.mechanism}</p>
                     <p className="text-[12.5px] text-ai-cyan">→ {it.recommendation}</p>
+                    <InteractionAlternatives
+                      pairString={it.drugs}
+                      prescriptions={prescriptions}
+                      onAdd={addAlternativePrescription}
+                      onReplace={replacePrescriptionWithAlternative}
+                    />
                   </div>
                 )}
               />
@@ -430,12 +481,22 @@ export default function PatientWorkspacePage() {
               ) : (
                 <div className="space-y-2">
                   {analysis.interactions.map((it, i) => (
-                    <div key={i} className={`flex items-center justify-between gap-2 p-2.5 rounded-lg border text-[12.5px] ${it.severity === "Low" ? "bg-white/[0.02] border-white/10 text-slate-400" : "bg-warn/5 border-warn/20 text-slate-300"}`}>
-                      <span className="flex items-center gap-2">
-                        {it.pair}
-                        {it.involvesNew && <span className="text-[9px] font-bold uppercase tracking-wide text-ai-cyan bg-ai-cyan/10 border border-ai-cyan/25 rounded-full px-1.5 py-0.5">New Rx</span>}
-                      </span>
-                      <SeverityPill level={it.severity} />
+                    <div key={i} className={`p-2.5 rounded-lg border text-[12.5px] ${it.severity === "Low" ? "bg-white/[0.02] border-white/10 text-slate-400" : "bg-warn/5 border-warn/20 text-slate-300"}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2">
+                          {it.pair}
+                          {it.involvesNew && <span className="text-[9px] font-bold uppercase tracking-wide text-ai-cyan bg-ai-cyan/10 border border-ai-cyan/25 rounded-full px-1.5 py-0.5">New Rx</span>}
+                        </span>
+                        <SeverityPill level={it.severity} />
+                      </div>
+                      {it.severity !== "Low" && (
+                        <InteractionAlternatives
+                          pairString={it.pair}
+                          prescriptions={prescriptions}
+                          onAdd={addAlternativePrescription}
+                          onReplace={replacePrescriptionWithAlternative}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -768,5 +829,60 @@ export default function PatientWorkspacePage() {
         </div>
       </main>
     </>
+  );
+}
+
+// Shown inline under a flagged interaction, wherever one of the two drugs
+// in the pair matches a current (non-consumable) prescription. Suggests
+// alternatives for that drug — "Add" appends the alternative as a separate
+// new prescription without touching the original (useful when the
+// prescriber should choose), "Replace" swaps it in place and keeps the
+// original on hand so the swap can be undone from the Medications list.
+function InteractionAlternatives({ pairString, prescriptions, onAdd, onReplace }) {
+  const [drugA, drugB] = pairString.split("+").map((s) => s.trim());
+  const targets = [drugA, drugB]
+    .filter(Boolean)
+    .map((name) => {
+      const idx = prescriptions.findIndex((rx) => !rx.consumable && rx.drug.toLowerCase() === name.toLowerCase());
+      return idx >= 0 ? { idx, name, alts: getAlternatives(name) } : null;
+    })
+    .filter((t) => t && t.alts.length > 0);
+
+  if (targets.length === 0) return null;
+
+  return (
+    <div className="mt-2.5 pt-2.5 border-t border-white/10 space-y-2.5">
+      {targets.map((t) => (
+        <div key={t.name}>
+          <div className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Alternatives for {t.name}</div>
+          <div className="space-y-1.5">
+            {t.alts.map((alt) => (
+              <div key={alt.drug} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white/[0.02] border border-white/10">
+                <div className="min-w-0">
+                  <div className="text-[12px] font-medium text-white">
+                    {alt.drug} {alt.dose} <span className="text-slate-400 font-normal">— {alt.route}, {alt.frequency}</span>
+                  </div>
+                  <div className="text-[10.5px] text-slate-500">{alt.rationale}</div>
+                </div>
+                <div className="flex gap-1.5 shrink-0">
+                  <button
+                    onClick={() => onAdd(alt)}
+                    className="text-[10px] font-semibold px-2.5 py-1.5 rounded-lg border border-ai-cyan/40 text-ai-cyan hover:bg-ai-cyan/10 transition-colors whitespace-nowrap"
+                  >
+                    + Add
+                  </button>
+                  <button
+                    onClick={() => onReplace(t.idx, alt)}
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg border border-mint/40 text-mint hover:bg-mint/10 transition-colors whitespace-nowrap"
+                  >
+                    <FiRepeat size={10} /> Replace
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

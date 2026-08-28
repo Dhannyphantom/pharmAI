@@ -1,8 +1,25 @@
 "use client";
 import { useState } from "react";
-import { FiUpload, FiFileText, FiCheckCircle, FiAlertTriangle, FiZap } from "react-icons/fi";
+import {
+  FiUpload,
+  FiFileText,
+  FiCheckCircle,
+  FiAlertTriangle,
+  FiZap,
+} from "react-icons/fi";
 import NavBar from "@/components/NavBar";
-import { PageHeader, GlowCard, PrimaryButton, GhostButton, ProgressRing, FadeIn, StaggerList, LiveThinking, AIErrorNote, LiveModeNote } from "@/components/ui";
+import {
+  PageHeader,
+  GlowCard,
+  PrimaryButton,
+  GhostButton,
+  ProgressRing,
+  FadeIn,
+  StaggerList,
+  LiveThinking,
+  AIErrorNote,
+  LiveModeNote,
+} from "@/components/ui";
 import ScanningSequence from "@/components/ScanningSequence";
 import { SCANNER_CASE } from "@/lib/miscData";
 import { useApp } from "@/context/AppContext";
@@ -35,7 +52,10 @@ export default function ScannerPage() {
     setLiveLoading(true);
     setStage("scanning");
     try {
-      const json = await askAIJson(`Simulated OCR text from prescription: ${ocrText.trim()}`, { system: SCANNER_SYSTEM_PROMPT, maxTokens: 700 });
+      const json = await askAIJson(
+        `Simulated OCR text from prescription: ${ocrText.trim()}`,
+        { system: SCANNER_SYSTEM_PROMPT, maxTokens: 700 },
+      );
       setLiveResult(json);
       setStage("report");
     } catch (e) {
@@ -62,15 +82,23 @@ export default function ScannerPage() {
         {stage === "upload" && !liveMode && (
           <GlowCard className="flex flex-col items-center justify-center py-16 border-dashed border-2 border-white/15">
             <FiUpload size={36} className="text-ai-cyan mb-4" />
-            <p className="text-slate-300 mb-1 font-medium">Drop a handwritten prescription here</p>
-            <p className="text-slate-500 text-xs mb-6">(Simulated — click below to run the demo)</p>
-            <PrimaryButton onClick={() => setStage("scanning")}>Simulate Prescription Upload</PrimaryButton>
+            <p className="text-slate-300 mb-1 font-medium">
+              Drop a handwritten prescription here
+            </p>
+            <p className="text-slate-500 text-xs mb-6">
+              (Simulated — click below to run the demo)
+            </p>
+            <PrimaryButton onClick={() => setStage("scanning")}>
+              Simulate Prescription Upload
+            </PrimaryButton>
           </GlowCard>
         )}
 
         {stage === "upload" && liveMode && (
           <GlowCard>
-            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Simulated OCR Output</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+              Simulated OCR Output
+            </label>
             <textarea
               value={ocrText}
               onChange={(e) => setOcrText(e.target.value)}
@@ -78,7 +106,11 @@ export default function ScannerPage() {
               rows={3}
               className="w-full bg-white/[0.04] border border-white/12 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-ai-cyan mb-4"
             />
-            <PrimaryButton onClick={runLiveScan} disabled={!ocrText.trim()} className="flex items-center gap-2">
+            <PrimaryButton
+              onClick={runLiveScan}
+              disabled={!ocrText.trim()}
+              className="flex items-center gap-2"
+            >
               <FiZap size={14} /> Analyze With Live AI
             </PrimaryButton>
           </GlowCard>
@@ -86,20 +118,32 @@ export default function ScannerPage() {
 
         {stage === "scanning" && !liveMode && (
           <GlowCard glow="glow-cyan">
-            <ScanningSequence steps={SCANNER_CASE.steps} onComplete={() => setStage("report")} />
+            <ScanningSequence
+              steps={SCANNER_CASE.steps}
+              onComplete={() => setStage("report")}
+            />
           </GlowCard>
         )}
 
         {stage === "scanning" && liveMode && (
           <GlowCard glow="glow-cyan">
-            {liveLoading && <LiveThinking label="Scanning live with Claude..." />}
-            {liveError && <AIErrorNote message={liveError} onRetry={runLiveScan} />}
+            {liveLoading && (
+              <LiveThinking label="Scanning live with Phantom..." />
+            )}
+            {liveError && (
+              <AIErrorNote message={liveError} onRetry={runLiveScan} />
+            )}
           </GlowCard>
         )}
 
         {stage === "report" && (
           <div className="space-y-5">
-            {liveMode && liveResult && <LiveModeNote>Live AI Mode — this analysis was generated live by Claude, not scripted</LiveModeNote>}
+            {liveMode && liveResult && (
+              <LiveModeNote>
+                Live AI Mode — this analysis was generated live by Claude, not
+                scripted
+              </LiveModeNote>
+            )}
             <FadeIn>
               <GlowCard>
                 <div className="flex items-center gap-2 text-slate-400 text-xs uppercase tracking-wide mb-2">
@@ -114,8 +158,16 @@ export default function ScannerPage() {
             <FadeIn delay={0.1}>
               <GlowCard>
                 <div className="flex flex-wrap justify-around gap-6 mb-2">
-                  <ProgressRing percent={result.riskScore} color="#F59E0B" label="Risk Score" />
-                  <ProgressRing percent={result.confidence} color="#22D3EE" label="AI Confidence" />
+                  <ProgressRing
+                    percent={result.riskScore}
+                    color="#F59E0B"
+                    label="Risk Score"
+                  />
+                  <ProgressRing
+                    percent={result.confidence}
+                    color="#22D3EE"
+                    label="AI Confidence"
+                  />
                 </div>
               </GlowCard>
             </FadeIn>
@@ -127,12 +179,20 @@ export default function ScannerPage() {
                   items={result.findings}
                   startDelay={0.1}
                   renderItem={(f) => (
-                    <div className={`flex items-start justify-between gap-3 p-4 rounded-xl border ${
-                      f.status === "warn" ? "bg-warn/5 border-warn/25" : "bg-mint/5 border-mint/20"
-                    }`}>
+                    <div
+                      className={`flex items-start justify-between gap-3 p-4 rounded-xl border ${
+                        f.status === "warn"
+                          ? "bg-warn/5 border-warn/25"
+                          : "bg-mint/5 border-mint/20"
+                      }`}
+                    >
                       <div>
-                        <div className="text-[13px] font-semibold text-white mb-0.5">{f.label}</div>
-                        <div className="text-[12.5px] text-slate-300">{f.value}</div>
+                        <div className="text-[13px] font-semibold text-white mb-0.5">
+                          {f.label}
+                        </div>
+                        <div className="text-[12.5px] text-slate-300">
+                          {f.value}
+                        </div>
                       </div>
                       {f.status === "warn" ? (
                         <FiAlertTriangle className="text-warn shrink-0 mt-0.5" />
@@ -146,7 +206,15 @@ export default function ScannerPage() {
             </FadeIn>
 
             <div className="flex justify-end">
-              <GhostButton onClick={() => { setStage("upload"); setLiveResult(null); setOcrText(""); }}>Scan Another Prescription</GhostButton>
+              <GhostButton
+                onClick={() => {
+                  setStage("upload");
+                  setLiveResult(null);
+                  setOcrText("");
+                }}
+              >
+                Scan Another Prescription
+              </GhostButton>
             </div>
           </div>
         )}

@@ -43,7 +43,18 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     function onKey(e) {
-      if (e.key === "f" || e.key === "F") toggleFullscreen();
+      if (e.key !== "f" && e.key !== "F") return;
+
+      // Don't hijack the keystroke while the person is typing anywhere —
+      // inputs, textareas, selects, and contenteditable regions — or while
+      // a modifier is held (Cmd/Ctrl+F is "find on page", not "fullscreen").
+      const target = e.target;
+      const tag = target?.tagName;
+      const isTypingContext =
+        tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable;
+      if (isTypingContext || e.ctrlKey || e.metaKey || e.altKey) return;
+
+      toggleFullscreen();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

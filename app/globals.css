@@ -63,6 +63,25 @@ body {
 }
 
 /* ==========================================================================
+   FORM CONTROLS
+   Native <select> dropdown popups are rendered by the OS/browser, not by
+   our CSS — left unstyled, they default to a light popup with the same
+   light text color we use for the closed control, making every option
+   unreadable. `color-scheme: dark` tells the browser to render native
+   controls (including the option list) using its dark variant, and the
+   explicit `option` colors reinforce it in engines that respect them.
+   ========================================================================== */
+
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #0B1730;
+  color: #E2E8F0;
+}
+
+/* ==========================================================================
    SURFACES — three elevations, used deliberately (not on every element)
    ========================================================================== */
 
