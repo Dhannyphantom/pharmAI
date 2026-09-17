@@ -1,186 +1,146 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   DESIGN TOKENS
-   A layered "console" system: deep navy base, three surface elevations,
-   one bright "power" accent (cyan) and two supporting accents (blue, violet).
-   Status colors are reserved for status only — never used decoratively.
+   DESIGN TOKENS — restrained, single-accent system
+   One accent (a quiet, confident blue), true neutrals, and three status
+   colors used only where they carry meaning (risk/priority pills, LMIS
+   states). No decorative gradients, no neon glow, no glassmorphism.
+
+   NOTE: token names are kept identical to the previous system on purpose —
+   every page in the app already references utilities like `bg-ai-cyan/10`,
+   `from-hospital-blue to-ai-violet`, `.glow-cyan`, `.text-gradient`. Rather
+   than touch 70+ files, we collapse the *values* those names resolve to,
+   so the whole app re-themes from this one file.
    ========================================================================== */
 
 @theme inline {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
 
-  --color-bg-deep: #060B16;
-  --color-bg-panel: #0B1730;
-  --color-bg-panel-2: #101F3F;
+  --color-bg-deep: #08090c;
+  --color-bg-panel: #101114;
+  --color-bg-panel-2: #17181c;
 
-  --color-hospital-blue: #2F6FED;
-  --color-hospital-blue-dim: #1E4FBE;
-  --color-ai-cyan: #22D3EE;
-  --color-ai-violet: #7C5CFF;
-  --color-mint: #34D399;
-  --color-warn: #F59E0B;
-  --color-danger: #EF4444;
-  --color-danger-dim: #7F1D1D;
+  /* Every one of these used to be a distinct neon hue (blue/cyan/violet).
+     They now live in the same restrained blue family so gradients and
+     "from X to Y" pairs read as a single deliberate color, not a rainbow. */
+  --color-hospital-blue: #3b6fe0;
+  --color-hospital-blue-dim: #2a52ac;
+  --color-ai-cyan: #4a7ce8;
+  --color-ai-violet: #5b6fd6;
+
+  /* Status colors — kept distinct because they carry real meaning
+     (risk level, stock status), desaturated so they read as signal
+     rather than decoration. */
+  --color-mint: #4f9d74;
+  --color-warn: #c98a3b;
+  --color-danger: #c9564c;
+  --color-danger-dim: #5c2b28;
 }
 
 :root {
-  --surface-0: rgba(255, 255, 255, 0.025);
-  --surface-1: rgba(255, 255, 255, 0.045);
-  --surface-2: rgba(255, 255, 255, 0.07);
+  --canvas: #07080a;
+  --panel: #111216;
+  --surface-0: rgba(255, 255, 255, 0.03);
+  --surface-1: rgba(255, 255, 255, 0.05);
+  --surface-2: rgba(255, 255, 255, 0.08);
   --border-hair: rgba(255, 255, 255, 0.08);
   --border-hair-strong: rgba(255, 255, 255, 0.14);
-  --ease-out-premium: cubic-bezier(0.16, 1, 0.3, 1);
+  --accent: #3b6fe0;
+  --accent-soft: rgba(59, 111, 224, 0.14);
+  --text-primary: #eef0f3;
+  --text-secondary: #9aa1ac;
+  --text-muted: #676d78;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --sidebar-w: 84px;
 }
 
 html, body { height: 100%; }
 html { scroll-behavior: smooth; }
-
-* { scrollbar-color: rgba(148,163,184,0.3) transparent; }
+* { scrollbar-color: rgba(148, 163, 184, 0.25) transparent; }
 
 body {
-  background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(47,111,237,0.16), transparent 60%),
-    radial-gradient(900px 700px at 100% 0%, rgba(124,92,255,0.12), transparent 55%),
-    radial-gradient(700px 500px at 50% 110%, rgba(34,211,238,0.06), transparent 60%),
-    #060B16;
-  background-attachment: fixed;
+  background: var(--canvas);
+  color: var(--text-primary);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-::selection { background: rgba(34,211,238,0.28); color: #fff; }
+/* Soft ambient light at the base of the viewport — the one deliberate
+   atmosphere effect, used once, globally, instead of per-card glow. */
+.app-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 480px at 50% 108%, rgba(59, 111, 224, 0.16), transparent 60%),
+    radial-gradient(700px 380px at 8% -6%, rgba(59, 111, 224, 0.06), transparent 60%);
+}
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
+::selection { background: rgba(59, 111, 224, 0.32); color: #fff; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.25); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.4); background-clip: padding-box; }
+::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.22); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.36); background-clip: padding-box; }
 
 :focus-visible {
-  outline: 2px solid rgba(34,211,238,0.85);
+  outline: 2px solid rgba(59, 111, 224, 0.85);
   outline-offset: 2px;
   border-radius: 6px;
 }
 
-/* ==========================================================================
-   FORM CONTROLS
-   Native <select> dropdown popups are rendered by the OS/browser, not by
-   our CSS — left unstyled, they default to a light popup with the same
-   light text color we use for the closed control, making every option
-   unreadable. `color-scheme: dark` tells the browser to render native
-   controls (including the option list) using its dark variant, and the
-   explicit `option` colors reinforce it in engines that respect them.
-   ========================================================================== */
-
-select {
-  color-scheme: dark;
-}
-
-select option {
-  background-color: #0B1730;
-  color: #E2E8F0;
-}
+select { color-scheme: dark; }
+select option { background-color: #14161a; color: #e6e8eb; }
 
 /* ==========================================================================
-   SURFACES — three elevations, used deliberately (not on every element)
+   SURFACES — flat, one elevation, thin hairline border. No blur, no
+   gradient wash, no drop shadow doing decorative work.
    ========================================================================== */
 
 .glass {
   position: relative;
-  background: linear-gradient(180deg, var(--surface-1), var(--surface-0));
+  background: var(--surface-0);
   border: 1px solid var(--border-hair);
-  border-radius: 16px;
-  box-shadow: 0 1px 0 0 rgba(255,255,255,0.05) inset, 0 12px 30px -18px rgba(0,0,0,0.6);
-  transition: border-color 0.25s var(--ease-out-premium), transform 0.25s var(--ease-out-premium), box-shadow 0.25s var(--ease-out-premium);
+  border-radius: 14px;
+  transition: border-color 0.2s var(--ease-out), transform 0.2s var(--ease-out);
 }
 
 .glass-strong {
-  background: linear-gradient(180deg, rgba(16,31,63,0.92), rgba(11,23,48,0.86));
+  background: #131418;
   border: 1px solid var(--border-hair-strong);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
 }
 
-/* Interactive surface: subtle lift + top-edge sheen on hover — the one
-   recurring micro-interaction used across cards, tiles, and nav items. */
-.surface-interactive {
-  cursor: pointer;
-}
-.surface-interactive::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(34,211,238,0), transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease, background 0.3s ease;
-  pointer-events: none;
-  border-radius: 16px 16px 0 0;
-}
+.surface-interactive { cursor: pointer; }
 .surface-interactive:hover {
-  border-color: rgba(34,211,238,0.32);
-  transform: translateY(-2px);
-  box-shadow: 0 1px 0 0 rgba(255,255,255,0.06) inset, 0 20px 40px -20px rgba(0,0,0,0.65), 0 0 0 1px rgba(34,211,238,0.06);
+  border-color: var(--border-hair-strong);
+  background: var(--surface-1);
 }
-.surface-interactive:hover::before {
-  opacity: 1;
-  background: linear-gradient(90deg, transparent, rgba(34,211,238,0.55), transparent);
-}
-.surface-interactive:active { transform: translateY(-1px) scale(0.996); }
+.surface-interactive:active { transform: scale(0.997); }
 
-.glow-cyan { box-shadow: 0 0 0 1px rgba(34,211,238,0.25), 0 0 40px -12px rgba(34,211,238,0.5); }
-.glow-blue { box-shadow: 0 0 0 1px rgba(47,111,237,0.3), 0 0 40px -12px rgba(47,111,237,0.55); }
-.glow-violet { box-shadow: 0 0 0 1px rgba(124,92,255,0.3), 0 0 40px -12px rgba(124,92,255,0.55); }
-.glow-danger { box-shadow: 0 0 0 1px rgba(239,68,68,0.35), 0 0 40px -12px rgba(239,68,68,0.5); }
-.glow-mint { box-shadow: 0 0 0 1px rgba(52,211,153,0.3), 0 0 40px -12px rgba(52,211,153,0.5); }
+/* Former neon glows — now a quiet 1px tint instead of a blurred halo, so
+   every page that already applies glow-cyan / glow-blue / glow-violet /
+   glow-mint / glow-danger keeps working but stops looking like a screensaver. */
+.glow-cyan, .glow-blue, .glow-violet { box-shadow: 0 0 0 1px rgba(59, 111, 224, 0.22); }
+.glow-mint { box-shadow: 0 0 0 1px rgba(79, 157, 116, 0.22); }
+.glow-danger { box-shadow: 0 0 0 1px rgba(201, 86, 76, 0.22); }
 
 /* ==========================================================================
    TYPOGRAPHY
    ========================================================================== */
 
-.text-gradient {
-  background: linear-gradient(90deg, #22D3EE, #7C5CFF 60%, #2F6FED);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
+.text-gradient { color: var(--text-primary); }
 
 .text-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-family: var(--font-sans);
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--color-ai-cyan);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.text-eyebrow::before {
-  content: "";
-  width: 14px;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--color-ai-cyan), transparent);
+  letter-spacing: 0.01em;
+  color: var(--text-secondary);
 }
 
 .tabular-nums { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
 
-/* ==========================================================================
-   GRID / TEXTURE — faint, used once as ambient atmosphere
-   ========================================================================== */
-
-.grid-fade-mask {
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 20%, black 40%, transparent 90%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 20%, black 40%, transparent 90%);
-}
-
-.hud-grid {
-  background-image:
-    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
-  background-size: 42px 42px;
-}
+.hud-grid, .grid-fade-mask { background: none; mask-image: none; }
 
 /* ==========================================================================
    BUTTONS
@@ -188,72 +148,58 @@ select option {
 
 .btn-primary {
   position: relative;
-  isolation: isolate;
-  background: linear-gradient(135deg, var(--color-hospital-blue), var(--color-ai-violet));
-  box-shadow: 0 1px 0 0 rgba(255,255,255,0.25) inset, 0 10px 24px -10px rgba(47,111,237,0.55);
+  background: var(--accent);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+  transition: background-color 0.15s var(--ease-out);
 }
-.btn-primary::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255,255,255,0.18), transparent 60%);
-  opacity: 0.7;
-  pointer-events: none;
-  z-index: -1;
-}
+.btn-primary:hover { background: #4a7ce8; }
+.btn-primary::after { content: none; }
 
 /* ==========================================================================
-   GAMIFICATION — achievement / status chips, level bars, quest steps
+   MOTION — kept minimal and purposeful, not scattered per-card
    ========================================================================== */
 
 @keyframes achievement-pop {
-  0% { opacity: 0; transform: scale(0.85) translateY(4px); }
-  60% { opacity: 1; transform: scale(1.03) translateY(0); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
+  0% { opacity: 0; transform: translateY(3px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
-.achievement-pop { animation: achievement-pop 0.45s var(--ease-out-premium); }
+.achievement-pop { animation: achievement-pop 0.3s var(--ease-out); }
 
-@keyframes shimmer-sweep {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-.shimmer {
-  background-image: linear-gradient(100deg, transparent 40%, rgba(255,255,255,0.55) 50%, transparent 60%);
-  background-size: 200% 100%;
-  animation: shimmer-sweep 2.4s ease-in-out infinite;
-}
+.shimmer { background: none; animation: none; }
 
 @keyframes pulse-ring {
-  0% { transform: scale(0.9); opacity: 0.6; }
-  100% { transform: scale(1.6); opacity: 0; }
+  0% { transform: scale(0.92); opacity: 0.5; }
+  100% { transform: scale(1.5); opacity: 0; }
 }
 .pulse-ring::before {
   content: "";
   position: absolute; inset: 0; border-radius: 9999px;
-  border: 2px solid currentColor;
-  animation: pulse-ring 1.8s cubic-bezier(0.4,0,0.6,1) infinite;
+  border: 1.5px solid currentColor;
+  animation: pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@keyframes soft-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-.soft-float { animation: soft-float 3.2s ease-in-out infinite; }
+.soft-float { animation: none; }
 
-/* Level / XP bar */
 .level-track {
-  height: 8px;
+  height: 6px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid var(--border-hair);
+  background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
 }
-.level-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--color-ai-cyan), var(--color-ai-violet));
+.level-fill { height: 100%; border-radius: 999px; background: var(--accent); }
+
+/* ==========================================================================
+   AI ORB — the one deliberate, animated focal element (see components/Orb.js)
+   ========================================================================== */
+
+@keyframes orb-spin { to { transform: rotate(360deg); } }
+@keyframes orb-drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+.orb-core {
+  background: conic-gradient(from 200deg, #3b6fe0, #6c7ce8, #4f9d74, #3b6fe0);
+  animation: orb-spin 9s linear infinite;
 }
+.orb-wrap { animation: orb-drift 5s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

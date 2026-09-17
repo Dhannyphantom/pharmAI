@@ -1,282 +1,165 @@
 "use client";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import {
-  FiActivity,
-  FiArrowRight,
-  FiUser,
-  FiHeart,
-  FiAward,
-  FiCamera,
-  FiShare2,
-  FiSliders,
-  FiPackage,
-  FiAlertTriangle,
-  FiAlertOctagon,
-  FiMessageCircle,
-  FiClipboard,
+  FiSearch, FiArrowRight, FiUser, FiHeart, FiAward, FiCamera, FiShare2,
+  FiSliders, FiPackage, FiAlertTriangle, FiAlertOctagon, FiMessageCircle,
+  FiClipboard, FiActivity, FiGrid, FiZap,
 } from "react-icons/fi";
-import NavBar from "@/components/NavBar";
 import { GlowCard } from "@/components/ui";
+import { useApp } from "@/context/AppContext";
+import Orb from "@/components/Orb";
 
 const MODULE_LINKS = [
-  {
-    href: "/cases",
-    label: "Patient Assessment",
-    desc: "Full 5-step AI clinical review flow",
-    icon: FiUser,
-  },
-  {
-    href: "/counseling",
-    label: "Patient Counselling & Drug Reference",
-    desc: "Patient-facing card plus clinical dosing reference",
-    icon: FiHeart,
-  },
-  {
-    href: "/training",
-    label: "Pharmacy Training — Virtual Patient",
-    desc: "Chat or talk with a virtual patient; AI coaches your counselling",
-    icon: FiMessageCircle,
-  },
-  {
-    href: "/challenge",
-    label: "AI vs Pharmacist",
-    desc: "Live audience quiz with scoring",
-    icon: FiAward,
-  },
-  {
-    href: "/scanner",
-    label: "Prescription Scanner",
-    desc: "Simulated handwriting-to-report pipeline",
-    icon: FiCamera,
-  },
-  {
-    href: "/interactions",
-    label: "Interaction Visualizer",
-    desc: "Pick two drugs, see the connection",
-    icon: FiShare2,
-  },
-  {
-    href: "/renal-calculator",
-    label: "Renal Dose Calculator & Pharmacogenomics",
-    desc: "Cockcroft-Gault CrCl, dose bands, and gene-drug demos",
-    icon: FiSliders,
-  },
-  {
-    href: "/theatre",
-    label: "Theatre",
-    desc: "Request board with complication planning, requests, payment tracker",
-    icon: FiActivity,
-  },
-  {
-    href: "/inventory",
-    label: "Inventory Management",
-    desc: "Predictive forecasting, LMIS analysis, expiry, requisitions, variance",
-    icon: FiPackage,
-  },
-  {
-    href: "/pharmacovigilance",
-    label: "Pharmacovigilance",
-    desc: "Signal detection from adverse reports",
-    icon: FiAlertTriangle,
-  },
-  {
-    href: "/patient",
-    label: "Patient Portal",
-    desc: "Adherence tracking, smart reminders, and instructions in local languages",
-    icon: FiHeart,
-  },
-  {
-    href: "/communication",
-    label: "Patient Communication",
-    desc: "Bridge language barriers during counselling",
-    icon: FiMessageCircle,
-  },
-  {
-    href: "/documentation",
-    label: "Documentation & Records",
-    desc: "AI-assisted intervention, dispensing, and incident documentation",
-    icon: FiClipboard,
-  },
-  {
-    href: "/drug-discovery",
-    label: "Drug Discovery",
-    desc: "Millions of molecules to one medicine",
-    icon: FiActivity,
-  },
-  {
-    href: "/hallucination",
-    label: "AI Hallucination Demo",
-    desc: "When the AI is confidently wrong",
-    icon: FiAlertOctagon,
-  },
+  { href: "/cases", label: "Patient assessment", desc: "Full clinical review flow, case by case.", icon: FiUser },
+  { href: "/counseling", label: "Counselling & drug reference", desc: "Patient-facing card plus clinical dosing reference.", icon: FiHeart },
+  { href: "/training", label: "Training — virtual patient", desc: "Practice counselling with a virtual patient.", icon: FiMessageCircle },
+  { href: "/challenge", label: "AI vs pharmacist", desc: "Live audience quiz with scoring.", icon: FiAward },
+  { href: "/scanner", label: "Prescription scanner", desc: "Simulated handwriting-to-report pipeline.", icon: FiCamera },
+  { href: "/interactions", label: "Interaction visualizer", desc: "Pick two drugs, see the connection.", icon: FiShare2 },
+  { href: "/renal-calculator", label: "Renal dosing & pharmacogenomics", desc: "Cockcroft-Gault CrCl, dose bands, gene-drug pairs.", icon: FiSliders },
+  { href: "/theatre", label: "Theatre", desc: "Request board, complication planning, payment tracker.", icon: FiActivity },
+  { href: "/inventory", label: "Inventory management", desc: "Forecasting, LMIS analysis, expiry, requisitions.", icon: FiPackage },
+  { href: "/pharmacovigilance", label: "Pharmacovigilance", desc: "Signal detection from adverse reports.", icon: FiAlertTriangle },
+  { href: "/patient", label: "Patient portal", desc: "Adherence, reminders, instructions in local languages.", icon: FiHeart },
+  { href: "/communication", label: "Patient communication", desc: "Bridge language barriers during counselling.", icon: FiMessageCircle },
+  { href: "/documentation", label: "Documentation & records", desc: "Dispensing, stock movements, and clinical notes.", icon: FiClipboard },
+  { href: "/drug-discovery", label: "Drug discovery", desc: "Millions of molecules to one medicine.", icon: FiActivity },
+  { href: "/hallucination", label: "AI hallucination demo", desc: "When the AI is confidently wrong.", icon: FiAlertOctagon },
 ];
 
 export default function Home() {
+  const [query, setQuery] = useState("");
+  const router = useRouter();
+  const { liveMode, setLiveMode } = useApp();
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return MODULE_LINKS;
+    return MODULE_LINKS.filter((m) => m.label.toLowerCase().includes(q) || m.desc.toLowerCase().includes(q));
+  }, [query]);
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (filtered.length > 0) router.push(filtered[0].href);
+  }
+
   return (
-    <>
-      <NavBar />
-      <main className="flex-1 flex flex-col items-center px-6 py-16 text-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="relative mb-8"
-        >
-          <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-ai-cyan via-hospital-blue to-ai-violet flex items-center justify-center glow-cyan relative">
-            <FiActivity size={38} className="text-white" />
-            <motion.div
-              className="absolute inset-0 rounded-3xl border-2 border-ai-cyan/50"
-              animate={{ scale: [1, 1.25, 1], opacity: [0.7, 0, 0.7] }}
-              transition={{ duration: 2.4, repeat: Infinity }}
+    <main className="flex-1 flex flex-col items-center px-6 py-16 sm:py-20 text-center">
+      <Orb size={112} className="mb-8" />
+
+      <h1 className="text-3xl sm:text-4xl font-semibold text-white mb-1.5">
+        Hi, Pharmacist
+      </h1>
+      <p className="text-3xl sm:text-4xl font-semibold text-white mb-4">
+        How can PhantomAI help today?
+      </p>
+      <p className="text-slate-500 text-[15px] max-w-md mx-auto mb-10 leading-relaxed">
+        From prescription checks to inventory forecasting — search a module below,
+        or jump straight into a patient.
+      </p>
+
+      {/* Command bar */}
+      <form onSubmit={handleSubmit} className="w-full max-w-xl mb-8">
+        <div className="rounded-2xl border border-white/10 bg-[var(--panel)] overflow-hidden">
+          <div className="flex items-center gap-3 px-4 py-4">
+            <FiSearch className="text-slate-500 shrink-0" size={17} />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search modules, e.g. inventory, interactions, scanner..."
+              className="flex-1 bg-transparent text-[15px] text-white placeholder:text-slate-500 focus:outline-none"
             />
           </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.15 }}
-        >
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-4 tracking-tight">
-            Phantom<span className="text-gradient">AI</span>
-          </h1>
-          <p className="text-slate-300 text-lg sm:text-xl max-w-xl mx-auto mb-8 font-medium">
-            The Clinical Pharmacy Assistant
-          </p>
-        </motion.div>
-
-        {/* Primary flows — Attend to Patient (pharmacist) and Patient Portal (patient) */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.25 }}
-          className="w-full max-w-2xl mb-6 grid sm:grid-cols-2 gap-4"
-        >
-          <Link href="/attend">
-            <GlowCard
-              interactive
-              glow="glow-violet"
-              className="border-ai-violet/30 text-left py-6 h-full"
+          <div className="flex items-center justify-between px-3 pb-3">
+            <div className="flex items-center gap-2">
+              <Link
+                href="#modules"
+                className="flex items-center gap-1.5 text-[12.5px] font-medium px-3 py-2 rounded-xl border border-white/10 text-slate-300 hover:bg-white/[0.05] transition-colors"
+              >
+                <FiGrid size={12} /> All modules
+              </Link>
+              <button
+                type="button"
+                onClick={() => setLiveMode(!liveMode)}
+                className={`flex items-center gap-1.5 text-[12.5px] font-medium px-3 py-2 rounded-xl border transition-colors ${
+                  liveMode
+                    ? "border-[var(--accent)]/50 text-[var(--accent)] bg-[var(--accent)]/10"
+                    : "border-white/10 text-slate-300 hover:bg-white/[0.05]"
+                }`}
+              >
+                <FiZap size={12} /> {liveMode ? "Live AI mode on" : "Live AI mode off"}
+              </button>
+            </div>
+            <button
+              type="submit"
+              className="w-9 h-9 rounded-xl bg-[var(--accent)] text-white flex items-center justify-center hover:bg-[#4a7ce8] transition-colors shrink-0"
+              aria-label="Go"
             >
-              <div className="flex items-center gap-3.5">
-                <div className="relative w-11 h-11 rounded-2xl bg-ai-violet/15 border border-ai-violet/30 flex items-center justify-center text-ai-violet shrink-0">
-                  <FiUser size={20} />
-                  <motion.div
-                    className="absolute inset-0 rounded-2xl border border-ai-violet/50"
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
-                    transition={{
-                      duration: 2.2,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-base font-bold text-white">
-                      Attend to Patient
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    For pharmacists — search a patient, get the full clinical
-                    workspace.
-                  </p>
-                </div>
-              </div>
-            </GlowCard>
-          </Link>
+              <FiArrowRight size={15} />
+            </button>
+          </div>
+        </div>
+      </form>
 
-          <Link href="/patient">
-            <GlowCard
-              interactive
-              glow="glow-mint"
-              className="border-mint/30 text-left py-6 h-full"
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="relative w-11 h-11 rounded-2xl bg-mint/15 border border-mint/30 flex items-center justify-center text-mint shrink-0">
-                  <FiHeart size={20} />
-                  <motion.div
-                    className="absolute inset-0 rounded-2xl border border-mint/50"
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
-                    transition={{
-                      duration: 2.2,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                      delay: 0.6,
-                    }}
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-base font-bold text-white">
-                      Patient Portal
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Simulates a patient already signed in — adherence,
-                    reminders, and instructions in your language.
-                  </p>
-                </div>
-              </div>
-            </GlowCard>
-          </Link>
-        </motion.div>
+      {/* Featured shortcuts */}
+      <div className="w-full max-w-3xl grid sm:grid-cols-3 gap-3 mb-16 text-left">
+        <Link href="/attend">
+          <GlowCard interactive className="h-full">
+            <FiUser className="text-slate-300 mb-3" size={18} />
+            <div className="text-[13.5px] font-semibold text-white mb-1">Attend to patient</div>
+            <p className="text-[12px] text-slate-500 leading-relaxed">Search a patient, open the full clinical workspace.</p>
+          </GlowCard>
+        </Link>
+        <Link href="/patient">
+          <GlowCard interactive className="h-full">
+            <FiHeart className="text-slate-300 mb-3" size={18} />
+            <div className="text-[13.5px] font-semibold text-white mb-1">Patient portal</div>
+            <p className="text-[12px] text-slate-500 leading-relaxed">Adherence, reminders, and instructions for a signed-in patient.</p>
+          </GlowCard>
+        </Link>
+        <Link href="/challenge">
+          <GlowCard interactive className="h-full">
+            <FiAward className="text-slate-300 mb-3" size={18} />
+            <div className="text-[13.5px] font-semibold text-white mb-1">AI vs pharmacist</div>
+            <p className="text-[12px] text-slate-500 leading-relaxed">Test your judgement against tricky prescribing scenarios.</p>
+          </GlowCard>
+        </Link>
+      </div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="flex items-center gap-2 text-[11px] text-slate-500 mb-4 uppercase tracking-wide"
-        >
-          <span className="w-8 h-px bg-white/15" /> Or explore standalone tools{" "}
-          <span className="w-8 h-px bg-white/15" />
-        </motion.div>
-
-        <motion.div
-          id="modules"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-          className="w-full max-w-5xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 text-left"
-        >
-          {MODULE_LINKS.map((m, i) => {
+      {/* Full module grid */}
+      <div id="modules" className="w-full max-w-5xl scroll-mt-24">
+        <div className="text-left mb-4">
+          <h2 className="text-sm font-semibold text-white">All modules</h2>
+          <p className="text-[12.5px] text-slate-500 mt-0.5">{filtered.length} of {MODULE_LINKS.length}</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-left">
+          {filtered.map((m) => {
             const Icon = m.icon;
             return (
-              <motion.div
-                key={m.href}
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  delay: 0.04 * i,
-                  duration: 0.45,
-                  ease: [0.16, 1, 0.3, 1],
-                }}
-              >
-                <Link href={m.href} className="block h-full">
-                  <GlowCard interactive className="h-full group">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center border bg-white/[0.04] border-white/10 text-ai-cyan">
-                        <Icon size={16} />
-                      </div>
-                      <FiArrowRight
-                        className="text-slate-500 group-hover:text-ai-cyan group-hover:translate-x-0.5 transition-all mt-2"
-                        size={14}
-                      />
+              <Link href={m.href} key={m.href} className="block h-full">
+                <GlowCard interactive className="h-full">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/[0.04] border border-white/10 text-slate-300">
+                      <Icon size={15} />
                     </div>
-                    <span className="font-semibold text-sm text-white">
-                      {m.label}
-                    </span>
-                    <p className="text-xs text-slate-400 leading-relaxed mt-1">
-                      {m.desc}
-                    </p>
-                  </GlowCard>
-                </Link>
-              </motion.div>
+                    <FiArrowRight className="text-slate-600 mt-1.5" size={13} />
+                  </div>
+                  <span className="font-medium text-[13.5px] text-white">{m.label}</span>
+                  <p className="text-[12px] text-slate-500 leading-relaxed mt-1">{m.desc}</p>
+                </GlowCard>
+              </Link>
             );
           })}
-        </motion.div>
-      </main>
-    </>
+          {filtered.length === 0 && (
+            <div className="col-span-full text-center text-slate-500 text-sm py-10">
+              No module matches &ldquo;{query}&rdquo;.
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
   );
 }

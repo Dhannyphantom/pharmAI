@@ -6,10 +6,10 @@ export default function ConfettiBurst({ trigger }) {
   useEffect(() => {
     if (!trigger) return;
     confetti({
-      particleCount: 90,
-      spread: 70,
+      particleCount: 80,
+      spread: 65,
       origin: { y: 0.6 },
-      colors: ["#22D3EE", "#7C5CFF", "#2F6FED", "#34D399"],
+      colors: ["#3b6fe0", "#4f9d74", "#9aa1ac"],
     });
   }, [trigger]);
   return null;
