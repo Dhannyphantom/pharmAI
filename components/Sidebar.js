@@ -4,9 +4,10 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  FiHome, FiGrid, FiUser, FiHeart, FiSettings, FiMaximize, FiMinimize,
+  FiHome, FiGrid, FiUser, FiHeart, FiMaximize, FiMinimize,
   FiZap, FiX, FiAward, FiCamera, FiShare2, FiSliders, FiPackage,
   FiAlertTriangle, FiActivity, FiAlertOctagon, FiMessageCircle, FiClipboard,
+  FiSun, FiMoon,
 } from "react-icons/fi";
 import { useApp } from "@/context/AppContext";
 
@@ -75,7 +76,7 @@ function RailButton({ active, label, onClick, href, children }) {
 export default function Sidebar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { isFullscreen, toggleFullscreen, liveMode, setLiveMode } = useApp();
+  const { isFullscreen, toggleFullscreen, liveMode, setLiveMode, theme, toggleTheme } = useApp();
 
   return (
     <>
@@ -114,8 +115,12 @@ export default function Sidebar() {
           <RailButton label={isFullscreen ? "Exit fullscreen" : "Fullscreen"} onClick={toggleFullscreen}>
             {isFullscreen ? <FiMinimize size={16} /> : <FiMaximize size={16} />}
           </RailButton>
-          <RailButton label="Settings">
-            <FiSettings size={16} />
+          <RailButton
+            label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}
+            onClick={toggleTheme}
+            active={theme === "light"}
+          >
+            {theme === "light" ? <FiMoon size={16} /> : <FiSun size={16} />}
           </RailButton>
           <div className="w-8 h-px bg-white/10 my-1" />
           <div className="w-9 h-9 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center text-slate-300 text-[12px] font-medium">

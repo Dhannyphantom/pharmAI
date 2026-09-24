@@ -2,7 +2,11 @@
  * The AI orb — one glossy, softly-rotating sphere standing in for
  * "the assistant is here / thinking." Pure CSS, no canvas, no particle
  * system. Used at three sizes: hero (home page), inline (loading states),
- * small (sidebar mark).
+ * small (sidebar mark). The core gradient pans and hue-shifts continuously
+ * (orb-fluid-shift) and a blurred, screen-blended color-bloom layer drifts
+ * behind it (orb-fluid-drift) for a liquid, non-mechanical motion — reused
+ * everywhere this component is dropped in, including every AI loading state
+ * (LiveThinking, ScanningSequence).
  */
 export default function Orb({ size = 120, active = true, className = "" }) {
   return (
@@ -17,6 +21,12 @@ export default function Orb({ size = 120, active = true, className = "" }) {
           animationPlayState: active ? "running" : "paused",
           boxShadow: `0 0 ${Math.round(size * 0.5)}px -${Math.round(size * 0.12)}px rgba(59,111,224,0.45)`,
         }}
+      />
+      {/* Liquid color bloom layer — soft blended blobs drifting behind the
+          core gradient, giving the "fluid" motion rather than a flat spin */}
+      <div
+        className="orb-fluid-layer absolute rounded-full"
+        style={{ animationPlayState: active ? "running" : "paused" }}
       />
       {/* Glass highlight */}
       <div

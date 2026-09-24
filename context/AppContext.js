@@ -10,12 +10,37 @@ export function AppProvider({ children }) {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("pharmai-live-mode") === "true";
   });
+  const [theme, setThemeState] = useState(() => {
+    if (typeof window === "undefined") return "dark";
+    return window.localStorage.getItem("pharmai-theme") || "dark";
+  });
 
   const setLiveMode = useCallback((value) => {
     setLiveModeState(value);
     if (typeof window !== "undefined") {
       window.localStorage.setItem("pharmai-live-mode", value ? "true" : "false");
     }
+  }, []);
+
+  const setTheme = useCallback((value) => {
+    setThemeState(value);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("pharmai-theme", value);
+      document.documentElement.setAttribute("data-theme", value);
+    }
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(theme === "light" ? "dark" : "light");
+  }, [theme, setTheme]);
+
+  // Apply the persisted theme on first mount (localStorage isn't available
+  // during SSR, so this can't happen in the initial state initializer).
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", theme);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addScore = useCallback((correct) => {
@@ -66,6 +91,7 @@ export function AppProvider({ children }) {
         score, addScore, resetScore,
         isFullscreen, toggleFullscreen,
         liveMode, setLiveMode,
+        theme, setTheme, toggleTheme,
       }}
     >
       {children}

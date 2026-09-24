@@ -55,6 +55,34 @@
   --sidebar-w: 84px;
 }
 
+/* ==========================================================================
+   LIGHT THEME — toggled via [data-theme="light"] on <html>, set from the
+   sidebar theme toggle (context/AppContext.js -> toggleTheme). Overrides
+   just the token values; every component already reads from these vars
+   (or from the @theme color-* tokens above, which stay constant across
+   themes since they're status/brand colors rather than surface colors).
+   ========================================================================== */
+:root[data-theme="light"] {
+  --canvas: #f4f5f7;
+  --panel: #ffffff;
+  --surface-0: rgba(15, 23, 42, 0.03);
+  --surface-1: rgba(15, 23, 42, 0.05);
+  --surface-2: rgba(15, 23, 42, 0.08);
+  --border-hair: rgba(15, 23, 42, 0.09);
+  --border-hair-strong: rgba(15, 23, 42, 0.16);
+  --text-primary: #0f1115;
+  --text-secondary: #4b5563;
+  --text-muted: #94a3b8;
+}
+:root[data-theme="light"] .app-ambient {
+  background:
+    radial-gradient(1100px 480px at 50% 108%, rgba(59, 111, 224, 0.10), transparent 60%),
+    radial-gradient(700px 380px at 8% -6%, rgba(59, 111, 224, 0.05), transparent 60%);
+}
+:root[data-theme="light"] .glass-strong { background: #ffffff; }
+:root[data-theme="light"] select { color-scheme: light; }
+:root[data-theme="light"] select option { background-color: #ffffff; color: #0f1115; }
+
 html, body { height: 100%; }
 html { scroll-behavior: smooth; }
 * { scrollbar-color: rgba(148, 163, 184, 0.25) transparent; }
@@ -190,15 +218,45 @@ select option { background-color: #14161a; color: #e6e8eb; }
 
 /* ==========================================================================
    AI ORB — the one deliberate, animated focal element (see components/Orb.js)
+   Fluid gradient motion: the core conic gradient pans across an oversized
+   background and hue-rotates on a loop (orb-fluid-shift), while a blurred,
+   screen-blended color-bloom layer drifts independently behind it
+   (orb-fluid-drift) for a liquid, non-mechanical feel. Reused everywhere
+   Orb is rendered, including every AI loading state (LiveThinking,
+   ScanningSequence).
    ========================================================================== */
 
 @keyframes orb-spin { to { transform: rotate(360deg); } }
 @keyframes orb-drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes orb-fluid-shift {
+  0%   { background-position: 0% 50%;   filter: hue-rotate(0deg); }
+  50%  { background-position: 100% 50%; filter: hue-rotate(35deg); }
+  100% { background-position: 0% 50%;   filter: hue-rotate(0deg); }
+}
+@keyframes orb-fluid-drift {
+  0%, 100% { transform: translate(-6%, -4%) scale(1); }
+  33%      { transform: translate(5%, 6%) scale(1.08); }
+  66%      { transform: translate(-4%, 5%) scale(0.96); }
+}
 
 .orb-core {
-  background: conic-gradient(from 200deg, #3b6fe0, #6c7ce8, #4f9d74, #3b6fe0);
-  animation: orb-spin 9s linear infinite;
+  background: conic-gradient(from 200deg, #3b6fe0, #6c7ce8, #22D3EE, #7C5CFF, #4f9d74, #3b6fe0);
+  background-size: 220% 220%;
+  animation: orb-spin 9s linear infinite, orb-fluid-shift 7s ease-in-out infinite;
 }
+
+.orb-fluid-layer {
+  inset: -6%;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(124,92,255,0.55), transparent 55%),
+    radial-gradient(circle at 70% 65%, rgba(34,211,238,0.5), transparent 55%),
+    radial-gradient(circle at 40% 80%, rgba(79,157,116,0.4), transparent 50%);
+  filter: blur(6px);
+  mix-blend-mode: screen;
+  animation: orb-fluid-drift 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
 .orb-wrap { animation: orb-drift 5s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
