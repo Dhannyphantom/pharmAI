@@ -6,14 +6,17 @@ import {
 } from "react-icons/fi";
 import NavBar from "@/components/NavBar";
 import { GlowCard, FadeIn, StaggerList, SegmentedTabs, ProgressRing, PrimaryButton, LiveThinking, AIErrorNote, LiveModeNote } from "@/components/ui";
+import SpeakButton from "@/components/SpeakButton";
+import TabSpeechSummary from "@/components/TabSpeechSummary";
 import { getSignedInPatient, getPatientAnalysis } from "@/lib/patients";
-import { getAdherenceLog, computeAdherence, DAY_LABELS } from "@/lib/adherenceData";
+import { getAdherenceLog, computeAdherence, DAY_LABELS, getCurrentDayIndex } from "@/lib/adherenceData";
 import { buildPatientSafetyAlerts } from "@/lib/patientFriendly";
 import { computePaymentRisk, PAYMENT_RISK_STYLE } from "@/lib/paymentRisk";
 import { LANGUAGES, getCannedMedicationTranslation, COMMON_PHRASES } from "@/lib/translations";
 import { findDrugByName } from "@/lib/counselingData";
 import { useApp } from "@/context/AppContext";
 import { askAI } from "@/lib/aiClient";
+import { speak, hasNativeVoice, isSpeechSynthesisSupported } from "@/lib/speech";
 
 const TABS = [
   { value: "overview", label: "Overview", icon: FiHeart },
@@ -65,7 +68,8 @@ export default function PatientPortalPage() {
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState(null);
 
-  const adherence = useMemo(() => computeAdherence(log), [log]);
+  const todayIndex = getCurrentDayIndex();
+  const adherence = useMemo(() => computeAdherence(log, todayIndex), [log, todayIndex]);
 
   if (!patient) {
     return (
@@ -91,9 +95,8 @@ export default function PatientPortalPage() {
   function markTaken(med) {
     setLog((prev) => {
       const days = [...(prev[med] || [])];
-      const idx = days.findIndex((d) => d === null);
-      if (idx === -1) return prev;
-      days[idx] = true;
+      if (days[todayIndex] !== null) return prev; // already logged, or not today's slot
+      days[todayIndex] = true;
       return { ...prev, [med]: days };
     });
   }
@@ -118,6 +121,36 @@ export default function PatientPortalPage() {
     }
   }
 
+  // Plain-English summaries used by the per-tab "Listen" button — either
+  // spoken directly, or translated live into the patient's chosen
+  // language first when Live AI Mode is on.
+  const overviewSummary = `You have taken ${adherence.taken} of ${adherence.total} doses due so far this week — that's ${adherence.overallPercent} percent adherence. ${
+    safetyAlerts.length > 0
+      ? `You have ${safetyAlerts.length} safety alert${safetyAlerts.length > 1 ? "s" : ""} worth discussing with your care team.`
+      : "No safety alerts have been flagged."
+  } ${
+    outstandingBills.length > 0
+      ? `You have ${outstandingBills.length} outstanding bill${outstandingBills.length > 1 ? "s" : ""} totaling ${paymentRisk.outstandingTotal.toLocaleString()} naira.`
+      : "You have no outstanding bills."
+  } ${nextReminder ? `Your next reminder is ${nextReminder.drug} at ${nextReminder.times[0]}.` : "No timed reminders are set up yet."}`;
+
+  const adherenceSummary = `This week you have taken ${adherence.taken} of ${adherence.total} doses due, which is ${adherence.overallPercent} percent. ` +
+    Object.keys(log).map((med) => `${med}: ${adherence.perMed[med]?.percent ?? 100} percent taken.`).join(" ");
+
+  const remindersSummary = reminders.length > 0
+    ? "Here are your medicine reminders. " + reminders.map((r) => `${r.drug}, ${r.times[0] === "As directed" ? "as directed" : `at ${r.times.join(" and ")}`}.`).join(" ")
+    : "You have no reminders set up yet.";
+
+  const safetySummary = safetyAlerts.length === 0
+    ? "Nothing has been flagged about your current medicines. Keep taking them as instructed."
+    : `You have ${safetyAlerts.length} safety alert${safetyAlerts.length > 1 ? "s" : ""}. ` +
+      safetyAlerts.map((a) => `${a.title}: ${a.message} ${a.action}.`).join(" ");
+
+  const billingSummary = outstandingBills.length === 0
+    ? "You have no outstanding balance. Thank you for keeping your account up to date."
+    : `You have ${outstandingBills.length} item${outstandingBills.length > 1 ? "s" : ""} awaiting payment, totaling ${paymentRisk.outstandingTotal.toLocaleString()} naira. ` +
+      outstandingBills.map((b) => `${b.item}, ${b.amount.toLocaleString()} naira, ${b.status}.`).join(" ");
+
   return (
     <>
       <NavBar />
@@ -137,91 +170,99 @@ export default function PatientPortalPage() {
         <SegmentedTabs tabs={TABS} active={tab} onChange={setTab} />
 
         {tab === "overview" && (
-          <div className="grid sm:grid-cols-2 gap-5">
-            <FadeIn>
-              <GlowCard className="flex items-center gap-5">
-                <ProgressRing percent={adherence.overallPercent} size={84} stroke={8} color="#34D399" />
-                <div>
-                  <div className="text-sm font-bold text-white mb-1">Medicine Adherence</div>
-                  <p className="text-[12.5px] text-slate-400">{adherence.taken} doses taken, {adherence.missed} missed this week.</p>
-                </div>
-              </GlowCard>
-            </FadeIn>
-            <FadeIn delay={0.05}>
-              <GlowCard className={safetyAlerts.length > 0 ? "border-warn/25" : "border-mint/25"}>
-                <div className="flex items-center gap-2 mb-1">
-                  <FiShield className={safetyAlerts.length > 0 ? "text-warn" : "text-mint"} size={16} />
-                  <span className="text-sm font-bold text-white">Safety Alerts</span>
-                </div>
-                <p className="text-2xl font-bold text-white tabular-nums mb-1">{safetyAlerts.length}</p>
-                <p className="text-[12.5px] text-slate-400">{safetyAlerts.length > 0 ? "Worth a chat with your care team." : "Nothing flagged right now."}</p>
-              </GlowCard>
-            </FadeIn>
-            <FadeIn delay={0.1}>
-              <GlowCard className={outstandingBills.length > 0 ? "border-warn/25" : ""}>
-                <div className="flex items-center gap-2 mb-1">
-                  <FiDollarSign className="text-warn" size={16} />
-                  <span className="text-sm font-bold text-white">Outstanding Bills</span>
-                </div>
-                <p className="text-2xl font-bold text-white tabular-nums mb-1">₦{paymentRisk.outstandingTotal.toLocaleString()}</p>
-                <p className="text-[12.5px] text-slate-400">{outstandingBills.length > 0 ? `${outstandingBills.length} item(s) awaiting payment.` : "You're all paid up."}</p>
-              </GlowCard>
-            </FadeIn>
-            <FadeIn delay={0.15}>
-              <GlowCard>
-                <div className="flex items-center gap-2 mb-1">
-                  <FiBell className="text-ai-cyan" size={16} />
-                  <span className="text-sm font-bold text-white">Next Reminder</span>
-                </div>
-                {nextReminder ? (
-                  <>
-                    <p className="text-white font-semibold text-sm mb-0.5">{nextReminder.drug} — {nextReminder.times[0]}</p>
-                    <p className="text-[12.5px] text-slate-400">Reminders are {remindersEnabled ? "on" : "off"}.</p>
-                  </>
-                ) : (
-                  <p className="text-[12.5px] text-slate-400">No timed reminders set up yet.</p>
-                )}
-              </GlowCard>
-            </FadeIn>
-          </div>
+          <>
+            <TabSpeechSummary summaryText={overviewSummary} language={language} liveMode={liveMode} />
+            <div className="grid sm:grid-cols-2 gap-5">
+              <FadeIn>
+                <GlowCard className="flex items-center gap-5">
+                  <ProgressRing percent={adherence.overallPercent} size={84} stroke={8} color="#34D399" />
+                  <div>
+                    <div className="text-sm font-bold text-white mb-1">Medicine Adherence</div>
+                    <p className="text-[12.5px] text-slate-400">{adherence.taken} doses taken, {adherence.missed} missed this week.</p>
+                  </div>
+                </GlowCard>
+              </FadeIn>
+              <FadeIn delay={0.05}>
+                <GlowCard className={safetyAlerts.length > 0 ? "border-warn/25" : "border-mint/25"}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <FiShield className={safetyAlerts.length > 0 ? "text-warn" : "text-mint"} size={16} />
+                    <span className="text-sm font-bold text-white">Safety Alerts</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white tabular-nums mb-1">{safetyAlerts.length}</p>
+                  <p className="text-[12.5px] text-slate-400">{safetyAlerts.length > 0 ? "Worth a chat with your care team." : "Nothing flagged right now."}</p>
+                </GlowCard>
+              </FadeIn>
+              <FadeIn delay={0.1}>
+                <GlowCard className={outstandingBills.length > 0 ? "border-warn/25" : ""}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <FiDollarSign className="text-warn" size={16} />
+                    <span className="text-sm font-bold text-white">Outstanding Bills</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white tabular-nums mb-1">₦{paymentRisk.outstandingTotal.toLocaleString()}</p>
+                  <p className="text-[12.5px] text-slate-400">{outstandingBills.length > 0 ? `${outstandingBills.length} item(s) awaiting payment.` : "You're all paid up."}</p>
+                </GlowCard>
+              </FadeIn>
+              <FadeIn delay={0.15}>
+                <GlowCard>
+                  <div className="flex items-center gap-2 mb-1">
+                    <FiBell className="text-ai-cyan" size={16} />
+                    <span className="text-sm font-bold text-white">Next Reminder</span>
+                  </div>
+                  {nextReminder ? (
+                    <>
+                      <p className="text-white font-semibold text-sm mb-0.5 flex items-center gap-2">
+                        {nextReminder.drug} — {nextReminder.times[0]}
+                        <SpeakButton text={`${nextReminder.drug} at ${nextReminder.times[0]}`} language="English" />
+                      </p>
+                      <p className="text-[12.5px] text-slate-400">Reminders are {remindersEnabled ? "on" : "off"}.</p>
+                    </>
+                  ) : (
+                    <p className="text-[12.5px] text-slate-400">No timed reminders set up yet.</p>
+                  )}
+                </GlowCard>
+              </FadeIn>
+            </div>
+          </>
         )}
 
         {tab === "adherence" && (
           <FadeIn>
+            <TabSpeechSummary summaryText={adherenceSummary} language={language} liveMode={liveMode} />
             <GlowCard className="mb-5 flex items-center gap-5">
               <ProgressRing percent={adherence.overallPercent} label="This Week" />
               <div>
                 <p className="text-sm text-slate-300 mb-1">You've taken <span className="text-mint font-semibold">{adherence.taken}</span> of <span className="font-semibold text-white">{adherence.total}</span> doses due so far this week.</p>
-                <p className="text-[12.5px] text-slate-500">Tap &ldquo;Mark as Taken&rdquo; on a medicine below once you've had your next due dose.</p>
+                <p className="text-[12.5px] text-slate-500">Tap &ldquo;Mark as Taken&rdquo; on a medicine below once you've had today&apos;s dose — today is highlighted below.</p>
               </div>
             </GlowCard>
 
             <div className="space-y-4">
               {Object.keys(log).map((med) => {
-                const days = log[med];
-                const nextIdx = days.findIndex((d) => d === null);
+                const days = adherence.perMed[med]?.days || log[med];
+                const canMark = days[todayIndex] === null;
                 return (
                   <GlowCard key={med}>
                     <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                       <span className="text-sm font-semibold text-white">{med}</span>
                       <button
                         onClick={() => markTaken(med)}
-                        disabled={nextIdx === -1}
+                        disabled={!canMark}
                         className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-mint/40 text-mint bg-mint/10 hover:bg-mint/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        {nextIdx === -1 ? "All Logged This Week" : "Mark as Taken"}
+                        {canMark ? "Mark as Taken" : "Logged for Today"}
                       </button>
                     </div>
                     <div className="grid grid-cols-7 gap-2">
                       {days.map((d, i) => (
                         <div key={i} className="flex flex-col items-center gap-1.5">
-                          <span className="text-[10px] text-slate-500 uppercase">{DAY_LABELS[i]}</span>
+                          <span className={`text-[10px] uppercase ${i === todayIndex ? "text-ai-cyan font-bold" : "text-slate-500"}`}>{DAY_LABELS[i]}</span>
                           <span className={`w-7 h-7 rounded-full flex items-center justify-center border ${
                             d === true ? "bg-mint/15 border-mint/40 text-mint" :
                             d === false ? "bg-danger/15 border-danger/40 text-danger" :
+                            i === todayIndex ? "bg-ai-cyan/10 border-ai-cyan/40 text-ai-cyan" :
                             "bg-white/[0.03] border-white/10 text-slate-600"
                           }`}>
-                            {d === true ? <FiCheck size={13} /> : d === false ? <FiX size={13} /> : "—"}
+                            {d === true ? <FiCheck size={13} /> : d === false ? <FiX size={13} /> : i === todayIndex ? "•" : "—"}
                           </span>
                         </div>
                       ))}
@@ -238,6 +279,7 @@ export default function PatientPortalPage() {
 
         {tab === "reminders" && (
           <FadeIn>
+            <TabSpeechSummary summaryText={remindersSummary} language={language} liveMode={liveMode} />
             <GlowCard className="mb-5 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-2.5">
                 <FiBell className="text-ai-cyan" size={18} />
@@ -262,7 +304,10 @@ export default function PatientPortalPage() {
                 <GlowCard className={!remindersEnabled ? "opacity-50" : ""}>
                   <div className="flex items-center justify-between flex-wrap gap-3">
                     <div>
-                      <div className="text-sm font-semibold text-white">{r.drug}</div>
+                      <div className="text-sm font-semibold text-white flex items-center gap-2">
+                        {r.drug}
+                        <SpeakButton text={`${r.drug}. ${r.times[0] === "As directed" ? "Take as directed." : `Reminder at ${r.times.join(", ")}.`}`} language="English" />
+                      </div>
                       <div className="text-[12px] text-slate-400">{r.frequency}</div>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -281,6 +326,7 @@ export default function PatientPortalPage() {
 
         {tab === "safety" && (
           <FadeIn>
+            <TabSpeechSummary summaryText={safetySummary} language={language} liveMode={liveMode} />
             {safetyAlerts.length === 0 ? (
               <GlowCard className="border-mint/25 flex items-center gap-3">
                 <FiCheckCircle className="text-mint shrink-0" size={20} />
@@ -309,6 +355,7 @@ export default function PatientPortalPage() {
 
         {tab === "billing" && (
           <FadeIn>
+            <TabSpeechSummary summaryText={billingSummary} language={language} liveMode={liveMode} />
             <GlowCard className={`mb-5 ${PAYMENT_RISK_STYLE[paymentRisk.level]}`}>
               <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
                 <span className="text-sm font-bold text-white">Account Summary</span>
@@ -378,6 +425,12 @@ export default function PatientPortalPage() {
                 </div>
               </div>
 
+              {isSpeechSynthesisSupported() && language !== "English" && !hasNativeVoice(language) && (
+                <p className="text-[11px] text-warn mb-4">
+                  No {language} voice is installed on this device — spoken audio plays in an approximate English voice. The written translation below is still accurate.
+                </p>
+              )}
+
               {liveMode ? (
                 <>
                   <PrimaryButton onClick={translateLive} disabled={liveLoading || !activeTranslateDrug} className="flex items-center gap-2 mb-3">
@@ -391,12 +444,7 @@ export default function PatientPortalPage() {
                       <div className="p-4 rounded-xl bg-ai-violet/5 border border-ai-violet/20 flex items-start justify-between gap-3">
                         <p className="text-[14px] text-slate-100 leading-relaxed">{liveTranslation}</p>
                         <button
-                          onClick={() => {
-                            if (typeof window !== "undefined" && window.speechSynthesis) {
-                              window.speechSynthesis.cancel();
-                              window.speechSynthesis.speak(new SpeechSynthesisUtterance(liveTranslation));
-                            }
-                          }}
+                          onClick={() => speak(liveTranslation, language)}
                           className="shrink-0 p-2 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/25 transition-colors"
                           title="Read aloud"
                         >
@@ -412,7 +460,16 @@ export default function PatientPortalPage() {
                   return canned ? (
                     <div className="p-4 rounded-xl bg-ai-violet/5 border border-ai-violet/20">
                       <p className="text-[11px] text-slate-500 mb-1.5">English: {canned.en}</p>
-                      <p className="text-[14px] text-slate-100 leading-relaxed">{canned.translated}</p>
+                      <p className="text-[14px] text-slate-100 leading-relaxed flex items-start justify-between gap-3">
+                        <span>{canned.translated}</span>
+                        <button
+                          onClick={() => speak(canned.translated, language)}
+                          className="shrink-0 p-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/25 transition-colors"
+                          title="Read aloud"
+                        >
+                          <FiVolume2 size={13} />
+                        </button>
+                      </p>
                     </div>
                   ) : (
                     <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 text-[12.5px] text-slate-500">
@@ -427,9 +484,12 @@ export default function PatientPortalPage() {
               <h3 className="text-white font-bold text-sm mb-3">Common Phrases — {language}</h3>
               <div className="space-y-2.5">
                 {COMMON_PHRASES.map((p) => (
-                  <div key={p.en} className="p-3 rounded-lg bg-white/[0.02] border border-white/10">
-                    <p className="text-[11.5px] text-slate-500 mb-1">{p.en}</p>
-                    <p className="text-[13px] text-slate-200">{p.translations[language]}</p>
+                  <div key={p.en} className="p-3 rounded-lg bg-white/[0.02] border border-white/10 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11.5px] text-slate-500 mb-1">{p.en}</p>
+                      <p className="text-[13px] text-slate-200">{p.translations[language]}</p>
+                    </div>
+                    <SpeakButton text={p.translations[language]} language={language} className="mt-1" />
                   </div>
                 ))}
               </div>

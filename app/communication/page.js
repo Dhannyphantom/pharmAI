@@ -1,15 +1,25 @@
 "use client";
 import { useState } from "react";
 import {
-  FiSend, FiGlobe, FiVolume2, FiZap, FiTrash2, FiUser, FiUserCheck, FiMic, FiMicOff,
+  FiSend, FiGlobe, FiVolume2, FiVolumeX, FiZap, FiTrash2, FiUser, FiUserCheck, FiMic, FiMicOff,
 } from "react-icons/fi";
 import NavBar from "@/components/NavBar";
 import { PageHeader, GlowCard, FadeIn, PrimaryButton, BackButton, LiveThinking, AIErrorNote, LiveModeNote } from "@/components/ui";
 import { LANGUAGES, COMMON_PHRASES, getCannedPhraseTranslation, getRandomPatientReply } from "@/lib/translations";
 import { useApp } from "@/context/AppContext";
 import { askAI } from "@/lib/aiClient";
+import {
+  speak,
+  stopSpeaking,
+  isSpeechSynthesisSupported,
+  isSpeechRecognitionSupported,
+  createRecognition,
+  hasNativeVoice,
+} from "@/lib/speech";
 
 const TRANSLATION_SYSTEM_PROMPT = (language) => `You are helping a hospital pharmacist communicate with a patient across a language barrier. Translate the pharmacist's message into ${language}, using simple everyday words a patient would understand. Preserve the medical meaning exactly. Respond with ONLY the translated text, no commentary, no quotation marks.`;
+
+const SPEECH_INTERPRET_SYSTEM_PROMPT = (language) => `You are helping a hospital pharmacist understand what a patient just said out loud. The patient spoke in ${language}. Translate their speech into clear, natural English, preserving the meaning exactly — do not add or remove information. Respond with ONLY the English translation, no commentary, no quotation marks.`;
 
 export default function CommunicationPage() {
   const { liveMode } = useApp();
@@ -20,11 +30,19 @@ export default function CommunicationPage() {
   const [liveError, setLiveError] = useState(null);
   const [listening, setListening] = useState(false);
   const [lastReplyEn, setLastReplyEn] = useState(null);
+  const [speakingId, setSpeakingId] = useState(null);
 
-  function speak(text) {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  const speechSupported = isSpeechSynthesisSupported();
+  const recognitionSupported = isSpeechRecognitionSupported();
+
+  function speakWithId(id, text, lang) {
+    if (speakingId === id) {
+      stopSpeaking();
+      setSpeakingId(null);
+      return;
+    }
+    speak(text, lang, { onEnd: () => setSpeakingId(null) });
+    setSpeakingId(id);
   }
 
   async function send(text) {
@@ -59,19 +77,77 @@ export default function CommunicationPage() {
     send(phrase.en);
   }
 
-  // Simulates listening to the patient speak in their own language and
-  // converting it to English for the pharmacist. Real browser speech
-  // recognition doesn't reliably support Hausa/Yoruba/Igbo/Pidgin, so this
-  // demonstrates the intended patient-to-English flow with a realistic
-  // "listening" pause and a representative example reply rather than
-  // actual microphone capture.
-  async function simulateListen() {
+  // Simulated fallback — used when real speech recognition isn't available,
+  // isn't supported for this language in this browser, or errors out. Shows
+  // a representative example reply so the flow can still be demonstrated.
+  async function simulateListenFallback() {
     setListening(true);
     await new Promise((resolve) => setTimeout(resolve, 1600));
     const reply = getRandomPatientReply(language, lastReplyEn);
     setLastReplyEn(reply.en);
-    setMessages((m) => [...m, { role: "patient", original: reply.original, english: reply.en }]);
+    setMessages((m) => [...m, { role: "patient", original: reply.original, english: reply.en, simulated: true }]);
     setListening(false);
+  }
+
+  // Real listening: capture the patient speaking in their own language via
+  // the browser's SpeechRecognition (requested in `language`'s BCP-47
+  // code), then — in Live AI Mode — have Claude interpret what was heard
+  // into English and read that translation back aloud. Falls back to the
+  // scripted example flow above if recognition isn't supported, isn't
+  // available for this language, or fails.
+  function handleListen() {
+    if (listening) return;
+    setLiveError(null);
+
+    const recognition = createRecognition(language);
+    if (!recognition) {
+      simulateListenFallback();
+      return;
+    }
+
+    let handledResult = false;
+    setListening(true);
+
+    recognition.onresult = async (e) => {
+      handledResult = true;
+      const transcript = e.results?.[0]?.[0]?.transcript || "";
+      setListening(false);
+      if (!transcript.trim()) {
+        simulateListenFallback();
+        return;
+      }
+      if (!liveMode) {
+        // No live model to interpret with — show the raw transcript as-is.
+        setMessages((m) => [...m, { role: "patient", original: transcript, english: transcript }]);
+        return;
+      }
+      setLiveLoading(true);
+      try {
+        const english = await askAI(transcript, {
+          system: SPEECH_INTERPRET_SYSTEM_PROMPT(language),
+          maxTokens: 220,
+        });
+        setMessages((m) => [...m, { role: "patient", original: transcript, english }]);
+        speak(english, "English");
+      } catch (err) {
+        setLiveError(err.message);
+      } finally {
+        setLiveLoading(false);
+      }
+    };
+
+    recognition.onerror = () => {
+      setListening(false);
+      if (!handledResult) simulateListenFallback();
+    };
+    recognition.onend = () => setListening(false);
+
+    try {
+      recognition.start();
+    } catch {
+      setListening(false);
+      simulateListenFallback();
+    }
   }
 
   return (
@@ -106,6 +182,12 @@ export default function CommunicationPage() {
           )}
         </div>
 
+        {speechSupported && language !== "English" && !hasNativeVoice(language) && (
+          <p className="text-[11px] text-warn mb-4 -mt-3">
+            No {language} voice is installed on this device — spoken audio will be read in an approximate English voice. The text translations above are still accurate.
+          </p>
+        )}
+
         <GlowCard className="mb-5">
           <h3 className="text-white font-bold text-sm mb-3">Common Phrases — Tap to Translate & Send</h3>
           <div className="flex flex-wrap gap-2">
@@ -124,7 +206,7 @@ export default function CommunicationPage() {
         <GlowCard className="mb-5 p-0 overflow-hidden">
           <div className="max-h-[420px] overflow-y-auto p-5 space-y-3">
             {messages.length === 0 && (
-              <p className="text-center text-slate-500 text-sm py-10">Type a message below, tap a common phrase above, or simulate listening to the patient to begin.</p>
+              <p className="text-center text-slate-500 text-sm py-10">Type a message below, tap a common phrase above, or listen to the patient to begin.</p>
             )}
             {messages.map((m, i) => (
               <div key={i} className="space-y-1.5">
@@ -140,9 +222,11 @@ export default function CommunicationPage() {
                         <div className="max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-white/[0.04] border border-white/10 text-slate-200 text-[13px] leading-relaxed flex items-start gap-2">
                           <FiUser size={12} className="shrink-0 mt-0.5 opacity-60" />
                           <span>{m.translated}</span>
-                          <button onClick={() => speak(m.translated)} className="shrink-0 text-slate-500 hover:text-white transition-colors" title="Read aloud">
-                            <FiVolume2 size={12} />
-                          </button>
+                          {speechSupported && (
+                            <button onClick={() => speakWithId(`ph-${i}`, m.translated, language)} className="shrink-0 text-slate-500 hover:text-white transition-colors" title={speakingId === `ph-${i}` ? "Stop" : "Read aloud"}>
+                              {speakingId === `ph-${i}` ? <FiVolumeX size={12} /> : <FiVolume2 size={12} />}
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -159,13 +243,23 @@ export default function CommunicationPage() {
                     <div className="max-w-[85%] space-y-1.5">
                       <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-mint/10 border border-mint/25 text-slate-200 text-[13px] leading-relaxed flex items-center gap-2">
                         <FiMic size={12} className="shrink-0 text-mint" /> {m.original}
+                        {speechSupported && (
+                          <button onClick={() => speakWithId(`orig-${i}`, m.original, language)} className="ml-auto shrink-0 text-slate-500 hover:text-white transition-colors" title={speakingId === `orig-${i}` ? "Stop" : "Read aloud"}>
+                            {speakingId === `orig-${i}` ? <FiVolumeX size={12} /> : <FiVolume2 size={12} />}
+                          </button>
+                        )}
                       </div>
                       <div className="px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-slate-300 text-[12.5px] flex items-center gap-2">
                         <span className="text-[9.5px] font-bold uppercase tracking-wide text-mint shrink-0">English</span> {m.english}
-                        <button onClick={() => speak(m.english)} className="ml-auto shrink-0 text-slate-500 hover:text-white transition-colors" title="Read aloud">
-                          <FiVolume2 size={12} />
-                        </button>
+                        {speechSupported && (
+                          <button onClick={() => speakWithId(`eng-${i}`, m.english, "English")} className="ml-auto shrink-0 text-slate-500 hover:text-white transition-colors" title={speakingId === `eng-${i}` ? "Stop" : "Read aloud"}>
+                            {speakingId === `eng-${i}` ? <FiVolumeX size={12} /> : <FiVolume2 size={12} />}
+                          </button>
+                        )}
                       </div>
+                      {m.simulated && (
+                        <p className="text-[10.5px] text-slate-600 pl-1">Example reply — real speech recognition for {language} wasn&apos;t available in this browser.</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -180,9 +274,11 @@ export default function CommunicationPage() {
           <div className="mb-4"><LiveModeNote>Live AI Mode — translations generated by Claude, not scripted</LiveModeNote></div>
         )}
 
-        {/* Patient's Response — simulated listening from the patient's
-            language into English, since real speech recognition for these
-            languages isn't reliably available in the browser. */}
+        {/* Patient's Response — tries real speech recognition in the
+            selected language first (via the browser's SpeechRecognition
+            API), then has Claude interpret it into English and reads that
+            back aloud. Falls back to a scripted example reply if real
+            recognition isn't supported or available for this language. */}
         <GlowCard className="mb-5 border-mint/20">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2.5">
@@ -192,15 +288,23 @@ export default function CommunicationPage() {
                 {listening ? <FiMicOff size={16} /> : <FiMic size={16} />}
               </div>
               <div>
-                <div className="text-sm font-bold text-white">Patient's Response</div>
-                <p className="text-[12px] text-slate-400">Simulates listening to the patient speak in {language} and converting it to English.</p>
+                <div className="text-sm font-bold text-white">Patient&apos;s Response</div>
+                <p className="text-[12px] text-slate-400">
+                  {recognitionSupported
+                    ? `Listens for the patient speaking ${language} and has Claude translate it to English.`
+                    : `Simulates listening to the patient speak in ${language} and converting it to English.`}
+                </p>
               </div>
             </div>
-            <PrimaryButton onClick={simulateListen} disabled={listening} className="flex items-center gap-2 shrink-0">
-              <FiMic size={14} /> {listening ? "Listening..." : "Simulate Listening"}
+            <PrimaryButton onClick={handleListen} disabled={listening} className="flex items-center gap-2 shrink-0">
+              <FiMic size={14} /> {listening ? "Listening..." : "Listen to Patient"}
             </PrimaryButton>
           </div>
-          <p className="text-[11px] text-slate-500 mt-3">Real-time speech recognition for Hausa, Yoruba, Igbo, and Pidgin isn't reliably supported in the browser yet — this uses a representative example reply to demonstrate the intended patient-to-English flow.</p>
+          <p className="text-[11px] text-slate-500 mt-3">
+            {recognitionSupported
+              ? "Real speech recognition isn't reliably supported for Hausa, Yoruba, Igbo, or Pidgin in every browser — if it can't understand, this falls back to a representative example reply."
+              : "This browser doesn't support live speech recognition, so this uses a representative example reply to demonstrate the intended patient-to-English flow."}
+          </p>
         </GlowCard>
 
         <GlowCard>
