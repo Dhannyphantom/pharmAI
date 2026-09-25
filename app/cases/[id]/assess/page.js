@@ -33,6 +33,8 @@ import ConfettiBurst from "@/components/ConfettiBurst";
 import { getCaseById } from "@/lib/cases";
 import { useApp } from "@/context/AppContext";
 import { askAIJson } from "@/lib/aiClient";
+import { getVitalStatus, getLabStatus } from "@/lib/clinicalReference";
+import ValueWithStatus from "@/components/ValueWithStatus";
 
 const SCAN_STEPS = [
   "Analyzing prescription...",
@@ -240,9 +242,12 @@ export default function AssessCase() {
                 Vitals
               </div>
               {Object.entries(c.vitals).map(([k, v]) => (
-                <div key={k} className="flex justify-between text-slate-300">
+                <div
+                  key={k}
+                  className="flex justify-between items-center text-slate-300 py-0.5"
+                >
                   <span className="text-slate-500">{k.toUpperCase()}</span>
-                  <span>{v}</span>
+                  <ValueWithStatus value={v} status={getVitalStatus(k, v)} />
                 </div>
               ))}
             </div>
@@ -251,9 +256,12 @@ export default function AssessCase() {
                 Labs
               </div>
               {Object.entries(c.labs).map(([k, v]) => (
-                <div key={k} className="flex justify-between text-slate-300">
+                <div
+                  key={k}
+                  className="flex justify-between items-center text-slate-300 py-0.5"
+                >
                   <span className="text-slate-500">{k}</span>
-                  <span>{v}</span>
+                  <ValueWithStatus value={v} status={getLabStatus(k, v)} />
                 </div>
               ))}
             </div>
