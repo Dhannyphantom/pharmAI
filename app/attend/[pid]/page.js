@@ -20,6 +20,8 @@ import { getAlternatives } from "@/lib/drugAlternatives";
 import { useApp } from "@/context/AppContext";
 import { askAI } from "@/lib/aiClient";
 import SectionNav from "@/components/SectionNav";
+import { getVitalStatus, getLabStatus, getAbgStatus } from "@/lib/clinicalReference";
+import ValueWithStatus from "@/components/ValueWithStatus";
 
 const ACTION_META = {
   Dispense: { icon: FiCheckCircle, color: "text-mint", bg: "bg-mint/10 border-mint/30" },
@@ -238,7 +240,10 @@ export default function PatientWorkspacePage() {
               <div>
                 <div className="text-[11px] text-slate-500 uppercase tracking-wide mb-1">Vitals</div>
                 {Object.entries(patient.vitals).map(([k, v]) => (
-                  <div key={k} className="flex justify-between text-slate-300"><span className="text-slate-500">{k.toUpperCase()}</span><span>{v}</span></div>
+                  <div key={k} className="flex justify-between items-center text-slate-300 py-0.5">
+                    <span className="text-slate-500">{k.toUpperCase()}</span>
+                    <ValueWithStatus value={v} status={getVitalStatus(k, v)} />
+                  </div>
                 ))}
               </div>
             )}
@@ -246,7 +251,10 @@ export default function PatientWorkspacePage() {
               <div>
                 <div className="text-[11px] text-slate-500 uppercase tracking-wide mb-1">Labs</div>
                 {Object.entries(patient.labs).map(([k, v]) => (
-                  <div key={k} className="flex justify-between text-slate-300"><span className="text-slate-500">{k}</span><span>{v}</span></div>
+                  <div key={k} className="flex justify-between items-center text-slate-300 py-0.5">
+                    <span className="text-slate-500">{k}</span>
+                    <ValueWithStatus value={v} status={getLabStatus(k, v)} />
+                  </div>
                 ))}
               </div>
             )}
@@ -303,7 +311,7 @@ export default function PatientWorkspacePage() {
                       </div>
                       <button
                         onClick={() => setDispensed((d) => ({ ...d, [i]: !d[i] }))}
-                        className={`shrink-0 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                        className={`shrink-0 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all duration-200 ease-out hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97] ${
                           done ? "border-mint/40 text-mint bg-mint/10" : "border-white/15 text-slate-300 hover:bg-white/5"
                         }`}
                       >
@@ -357,7 +365,7 @@ export default function PatientWorkspacePage() {
                       </div>
                       <button
                         onClick={() => addRecommended(rec)}
-                        className="shrink-0 flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-ai-cyan/40 text-ai-cyan bg-ai-cyan/10 hover:bg-ai-cyan/20 transition-colors"
+                        className="shrink-0 flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-ai-cyan/40 text-ai-cyan bg-ai-cyan/10 hover:bg-ai-cyan/20 transition-all duration-200 ease-out hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97]"
                       >
                         <FiPlus size={11} /> Add
                       </button>
@@ -515,7 +523,13 @@ export default function PatientWorkspacePage() {
                   <h3 className="text-white font-bold text-sm mb-3 flex items-center gap-2"><FiTarget className="text-ai-cyan" /> Renal Function & Dosing</h3>
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <div className="text-2xl font-bold text-white tabular-nums">{analysis.renal.chartCrcl} <span className="text-sm font-normal text-slate-400">mL/min</span></div>
+                      <div className="text-2xl font-bold text-white tabular-nums flex items-center gap-2">
+                        <ValueWithStatus
+                          value={analysis.renal.chartCrcl}
+                          status={getLabStatus("creatinine clearance", String(analysis.renal.chartCrcl))}
+                        />
+                        <span className="text-sm font-normal text-slate-400">mL/min</span>
+                      </div>
                       {analysis.renal.calculatedCrcl !== null && (
                         <div className="text-[11px] text-slate-500">Cockcroft-Gault recalculation: {analysis.renal.calculatedCrcl} mL/min</div>
                       )}
@@ -571,21 +585,29 @@ export default function PatientWorkspacePage() {
               </div>
 
               <div className="grid sm:grid-cols-4 gap-3 mb-4">
-                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/10 text-center">
+                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/10 text-center transition-colors duration-200 hover:bg-white/[0.04] hover:border-white/15">
                   <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">pH</div>
-                  <div className="text-lg font-bold text-white tabular-nums">{patient.abg.pH}</div>
+                  <div className="text-lg font-bold text-white tabular-nums flex flex-col items-center gap-1">
+                    <ValueWithStatus value={patient.abg.pH} status={getAbgStatus("ph", patient.abg.pH)} />
+                  </div>
                 </div>
-                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/10 text-center">
+                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/10 text-center transition-colors duration-200 hover:bg-white/[0.04] hover:border-white/15">
                   <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">pCO₂</div>
-                  <div className="text-lg font-bold text-white tabular-nums">{patient.abg.pco2} <span className="text-[10px] font-normal text-slate-500">mmHg</span></div>
+                  <div className="text-lg font-bold text-white tabular-nums flex flex-col items-center gap-1">
+                    <ValueWithStatus value={`${patient.abg.pco2} mmHg`} status={getAbgStatus("pco2", patient.abg.pco2)} />
+                  </div>
                 </div>
-                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/10 text-center">
+                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/10 text-center transition-colors duration-200 hover:bg-white/[0.04] hover:border-white/15">
                   <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">HCO₃⁻</div>
-                  <div className="text-lg font-bold text-white tabular-nums">{patient.abg.hco3} <span className="text-[10px] font-normal text-slate-500">mEq/L</span></div>
+                  <div className="text-lg font-bold text-white tabular-nums flex flex-col items-center gap-1">
+                    <ValueWithStatus value={`${patient.abg.hco3} mEq/L`} status={getAbgStatus("hco3", patient.abg.hco3)} />
+                  </div>
                 </div>
-                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/10 text-center">
+                <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/10 text-center transition-colors duration-200 hover:bg-white/[0.04] hover:border-white/15">
                   <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">Lactate</div>
-                  <div className="text-lg font-bold text-white tabular-nums">{patient.abg.lactate} <span className="text-[10px] font-normal text-slate-500">mmol/L</span></div>
+                  <div className="text-lg font-bold text-white tabular-nums flex flex-col items-center gap-1">
+                    <ValueWithStatus value={`${patient.abg.lactate} mmol/L`} status={getAbgStatus("lactate", patient.abg.lactate)} />
+                  </div>
                 </div>
               </div>
 
@@ -695,7 +717,7 @@ export default function PatientWorkspacePage() {
 
               <div className="space-y-2">
                 {filteredBilling.map((b, i) => (
-                  <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/10 text-[12.5px]">
+                  <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/10 text-[12.5px] transition-colors duration-200 hover:bg-white/[0.04]">
                     <div className="flex items-center gap-3">
                       <FiClock className="text-slate-500 shrink-0" size={12} />
                       <div>
@@ -867,13 +889,13 @@ function InteractionAlternatives({ pairString, prescriptions, onAdd, onReplace }
                 <div className="flex gap-1.5 shrink-0">
                   <button
                     onClick={() => onAdd(alt)}
-                    className="text-[10px] font-semibold px-2.5 py-1.5 rounded-lg border border-ai-cyan/40 text-ai-cyan hover:bg-ai-cyan/10 transition-colors whitespace-nowrap"
+                    className="text-[10px] font-semibold px-2.5 py-1.5 rounded-lg border border-ai-cyan/40 text-ai-cyan hover:bg-ai-cyan/10 transition-all duration-200 ease-out hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap"
                   >
                     + Add
                   </button>
                   <button
                     onClick={() => onReplace(t.idx, alt)}
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg border border-mint/40 text-mint hover:bg-mint/10 transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg border border-mint/40 text-mint hover:bg-mint/10 transition-all duration-200 ease-out hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap"
                   >
                     <FiRepeat size={10} /> Replace
                   </button>

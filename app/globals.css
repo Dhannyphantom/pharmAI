@@ -82,10 +82,12 @@
 :root[data-theme="light"] .glass-strong { background: #ffffff; }
 :root[data-theme="light"] select { color-scheme: light; }
 :root[data-theme="light"] select option { background-color: #ffffff; color: #0f1115; }
+:root[data-theme="light"] .vwt-tooltip { background: #ffffff; border-color: var(--border-hair-strong); box-shadow: 0 14px 34px -12px rgba(15, 23, 42, 0.25); }
+:root[data-theme="light"] .vwt-tooltip::after { border-top-color: #ffffff; }
 
 html, body { height: 100%; }
 html { scroll-behavior: smooth; }
-* { scrollbar-color: rgba(148, 163, 184, 0.25) transparent; }
+* { scrollbar-color: rgba(148, 163, 184, 0.3) transparent; }
 
 body {
   background: var(--canvas);
@@ -106,10 +108,27 @@ body {
 }
 
 ::selection { background: rgba(59, 111, 224, 0.32); color: #fff; }
-::-webkit-scrollbar { width: 9px; height: 9px; }
+
+/* ==========================================================================
+   CUSTOM SCROLLBAR — thicker, gradient thumb with a hover state, rounded
+   ends and a soft glow, replacing the flat single-color bar everywhere
+   webkit scrolling shows up (page body, modals, long tables, chat panes).
+   ========================================================================== */
+::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.22); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.36); background-clip: padding-box; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--color-hospital-blue), var(--color-ai-violet));
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--color-ai-cyan), var(--color-hospital-blue));
+  background-clip: padding-box;
+  box-shadow: 0 0 12px rgba(74, 124, 232, 0.35);
+}
+::-webkit-scrollbar-corner { background: transparent; }
 
 :focus-visible {
   outline: 2px solid rgba(59, 111, 224, 0.85);
@@ -130,7 +149,7 @@ select option { background-color: #14161a; color: #e6e8eb; }
   background: var(--surface-0);
   border: 1px solid var(--border-hair);
   border-radius: 14px;
-  transition: border-color 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+  transition: border-color 0.25s var(--ease-out), background-color 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out);
 }
 
 .glass-strong {
@@ -142,8 +161,9 @@ select option { background-color: #14161a; color: #e6e8eb; }
 .surface-interactive:hover {
   border-color: var(--border-hair-strong);
   background: var(--surface-1);
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.55);
 }
-.surface-interactive:active { transform: scale(0.997); }
+.surface-interactive:active { filter: brightness(0.98); }
 
 /* Former neon glows — now a quiet 1px tint instead of a blurred halo, so
    every page that already applies glow-cyan / glow-blue / glow-violet /
@@ -182,6 +202,62 @@ select option { background-color: #14161a; color: #e6e8eb; }
 }
 .btn-primary:hover { background: #4a7ce8; }
 .btn-primary::after { content: none; }
+
+/* ==========================================================================
+   VALUE TOOLTIP — hover/focus card shown over any vitals/labs/ABG value
+   that has a known reference range (see components/ValueWithStatus.js).
+   Fades and rises in on hover, with a small arrow anchoring it to the
+   value it describes.
+   ========================================================================== */
+.vwt-wrap {
+  position: relative;
+  cursor: help;
+}
+.vwt-tooltip {
+  position: absolute;
+  z-index: 40;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  min-width: 190px;
+  transform: translate(-50%, 6px) scale(0.94);
+  transform-origin: bottom center;
+  background: #14161b;
+  border: 1px solid var(--border-hair-strong);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  opacity: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.6);
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
+}
+.vwt-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #14161b;
+}
+.vwt-tooltip-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.vwt-tooltip-row { display: flex; justify-content: space-between; gap: 14px; }
+.vwt-tooltip-actual { color: var(--accent); font-weight: 600; }
+.vwt-wrap:hover .vwt-tooltip,
+.vwt-wrap:focus-visible .vwt-tooltip,
+.vwt-wrap:focus-within .vwt-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
 
 /* ==========================================================================
    MOTION — kept minimal and purposeful, not scattered per-card

@@ -11,12 +11,15 @@ import Orb from "./Orb";
 
 export function GlowCard({ children, className = "", glow = "", interactive = false, ...props }) {
   return (
-    <div
+    <motion.div
       className={`glass rounded-2xl p-5 sm:p-6 ${glow} ${interactive ? "surface-interactive" : ""} ${className}`}
+      whileHover={interactive ? { y: -4, scale: 1.012 } : { y: -2 }}
+      whileTap={interactive ? { scale: 0.99 } : undefined}
+      transition={{ type: "spring", stiffness: 340, damping: 26 }}
       {...props}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }
 
@@ -43,7 +46,7 @@ export function BackButton({ label = "Back", fallbackHref = "/", className = "" 
     }
   }
   return (
-    <button onClick={handleClick} className={`flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition-colors mb-6 ${className}`}>
+    <button onClick={handleClick} className={`flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition-all duration-200 hover:-translate-x-0.5 mb-6 ${className}`}>
       <FiArrowLeft size={14} /> {label}
     </button>
   );
@@ -56,7 +59,7 @@ export function BackButton({ label = "Back", fallbackHref = "/", className = "" 
 export function PrimaryButton({ children, className = "", ...props }) {
   return (
     <button
-      className={`btn-primary px-5 py-2.5 rounded-xl text-white font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed ${className}`}
+      className={`btn-primary px-5 py-2.5 rounded-xl text-white font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_10px_24px_-10px_rgba(59,111,224,0.55)] active:translate-y-0 active:scale-[0.97] ${className}`}
       {...props}
     >
       {children}
@@ -67,7 +70,7 @@ export function PrimaryButton({ children, className = "", ...props }) {
 export function GhostButton({ children, className = "", ...props }) {
   return (
     <button
-      className={`px-4 py-2.5 rounded-xl border border-white/12 bg-white/[0.02] text-slate-200 font-medium text-sm hover:bg-white/[0.06] hover:border-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${className}`}
+      className={`px-4 py-2.5 rounded-xl border border-white/12 bg-white/[0.02] text-slate-200 font-medium text-sm hover:bg-white/[0.06] hover:border-white/20 transition-all duration-200 ease-out hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${className}`}
       {...props}
     >
       {children}
@@ -107,7 +110,7 @@ export function ProgressRing({ percent, size = 120, stroke = 9, color = "var(--a
   const circumference = 2 * Math.PI * r;
   const offset = circumference * (1 - percent / 100);
   return (
-    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+    <div className="relative inline-flex items-center justify-center transition-transform duration-300 hover:scale-[1.04]" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.07)" strokeWidth={stroke} fill="none" />
         <motion.circle
@@ -120,7 +123,8 @@ export function ProgressRing({ percent, size = 120, stroke = 9, color = "var(--a
           strokeLinecap="round"
           strokeDasharray={circumference}
           initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset: offset }}
+          whileInView={{ strokeDashoffset: offset }}
+          viewport={{ once: true }}
           transition={{ duration: 0.9, ease: "easeOut" }}
         />
       </svg>
@@ -147,8 +151,9 @@ export function LevelBar({ percent, color = "var(--accent)", label, value }) {
           className="level-fill"
           style={{ background: color }}
           initial={{ width: 0 }}
-          animate={{ width: `${clamped}%` }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
+          whileInView={{ width: `${clamped}%` }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
         />
       </div>
     </div>
@@ -166,7 +171,7 @@ const SEVERITY_STYLES = {
 export function SeverityPill({ level }) {
   const cls = SEVERITY_STYLES[level] || "bg-white/8 text-slate-300 border-white/15";
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium border ${cls}`}>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium border transition-transform duration-150 hover:scale-105 ${cls}`}>
       {level}
     </span>
   );
@@ -199,7 +204,7 @@ export function SegmentedTabs({ tabs, active, onChange }) {
           <button
             key={t.value}
             onClick={() => onChange(t.value)}
-            className={`flex items-center gap-2 shrink-0 px-3.5 py-2 rounded-xl text-[13.5px] font-medium border transition-colors ${
+            className={`flex items-center gap-2 shrink-0 px-3.5 py-2 rounded-xl text-[13.5px] font-medium border transition-all duration-200 ease-out hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97] ${
               isActive
                 ? "bg-[var(--accent)] text-white border-transparent"
                 : "border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-200"
@@ -237,7 +242,7 @@ export function Modal({ open, onClose, title, eyebrow, children, wide = false })
                 {eyebrow && <div className="text-eyebrow mb-1.5">{eyebrow}</div>}
                 {title && <h3 className="text-lg font-semibold text-white">{title}</h3>}
               </div>
-              <button onClick={onClose} className="shrink-0 p-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/25 transition-colors">
+              <button onClick={onClose} className="shrink-0 p-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/25 transition-all duration-150 hover:rotate-90">
                 <FiX size={16} />
               </button>
             </div>
@@ -250,15 +255,16 @@ export function Modal({ open, onClose, title, eyebrow, children, wide = false })
 }
 
 /* ---------------------------------------------------------------------- */
-/* Motion helpers — one entrance style, used quietly                      */
+/* Motion helpers — scroll-triggered entrance, used quietly                */
 /* ---------------------------------------------------------------------- */
 
-export function FadeIn({ children, delay = 0, className = "", y = 8 }) {
+export function FadeIn({ children, delay = 0, className = "", y = 10 }) {
   return (
     <motion.div
       initial={{ opacity: 0, y }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay, ease: "easeOut" }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.45, delay, ease: [0.16, 1, 0.3, 1] }}
       className={className}
     >
       {children}
@@ -296,7 +302,7 @@ export function AIErrorNote({ message, onRetry }) {
     <div className="p-4 rounded-xl bg-danger/8 border border-danger/20 text-[13px] text-danger flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
       <span>{message}</span>
       {onRetry && (
-        <button onClick={onRetry} className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-danger/30 text-danger text-xs font-medium hover:bg-danger/10 transition-colors">
+        <button onClick={onRetry} className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-danger/30 text-danger text-xs font-medium hover:bg-danger/10 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0">
           <FiRefreshCw size={11} /> Try again
         </button>
       )}
